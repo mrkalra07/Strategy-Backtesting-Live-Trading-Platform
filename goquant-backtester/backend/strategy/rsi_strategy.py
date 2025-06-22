@@ -1,4 +1,13 @@
 import pandas as pd
+def compute_rsi(series, period=14):
+    delta = series.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.ewm(alpha=1/period, min_periods=period).mean()
+    avg_loss = loss.ewm(alpha=1/period, min_periods=period).mean()
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
 
 def generate_rsi_signals(data, period=14, overbought=70, oversold=30):
     df = pd.DataFrame(data)

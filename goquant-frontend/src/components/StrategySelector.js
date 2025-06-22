@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Button, FormControl, InputLabel, MenuItem, Select, Typography } from '@mui/material';
+import { Button, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 
 const StrategySelector = ({ onRunBacktest }) => {
   const [strategy, setStrategy] = useState('ema');
 
   const handleRun = () => {
-    console.log("Running backtest with:", strategy);
     onRunBacktest(strategy);
   };
 
@@ -21,6 +20,7 @@ const StrategySelector = ({ onRunBacktest }) => {
           <MenuItem value="ema">EMA</MenuItem>
           <MenuItem value="rsi">RSI</MenuItem>
           <MenuItem value="macd">MACD</MenuItem>
+          <MenuItem value="custom">Custom Strategy</MenuItem>
         </Select>
       </FormControl>
 

@@ -1,46 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import UploadCSV from './components/UploadCSV';
 import StrategySelector from './components/StrategySelector';
-import BacktestTable from './components/BacktestTable';
+import StrategyBuilder from './components/StrategyBuilder';
 import BacktestChart from './components/BacktestChart';
-import { Typography } from '@mui/material';
-import PerformanceMetrics from './components/PerformanceMetrics';
 import EquityCurveChart from './components/EquityCurveChart';
-
+import PerformanceMetrics from './components/PerformanceMetrics';
+import BacktestTable from './components/BacktestTable';
+import { Typography } from '@mui/material';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
 
 function App() {
   const [uploadedData, setUploadedData] = useState(null);
-  const [backtestResult, setBacktestResult] = useState(null);
   const [strategy, setStrategy] = useState(null);
-
+  const [customLogic, setCustomLogic] = useState(null);
+  const [backtestResult, setBacktestResult] = useState(null);
 
   const handleUploadSuccess = (data) => {
     setUploadedData(data);
-    console.log('CSV uploaded successfully');
   };
 
-  const handleRunBacktest = async (strategy) => {
-    setStrategy(strategy);
-    try {
-      const res = await fetch('http://localhost:8000/backtest', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    strategy,
-    data: uploadedData,
-  }),
-});
+  const handleCustomLogic = (logic) => {
+    setCustomLogic(logic);
+  };
+  const handleCustomStrategy = (logic) => {
+  console.log("🛠️ Custom strategy built:", logic);
+  setCustomLogic(logic);
+  handleRunBacktest('custom'); // Run backtest immediately!
+};
 
-      if (res.ok) {
-        const result = await res.json();
-        setBacktestResult(result);
-        console.log('Backtest completed');
-      } else {
-        console.error('Backtest failed with status:', res.status);
+  const handleRunBacktest = async (selectedStrategy) => {
+    setStrategy(selectedStrategy);
+
+    const payload = {
+      strategy: selectedStrategy,
+      data: uploadedData,
+    };
+    if (selectedStrategy === 'custom') {
+      if (!customLogic) {
+        alert('Please build your custom strategy first.');
+        return;
       }
-    } catch (err) {
-      console.error('Error during backtest:', err);
+      payload.logic = customLogic;
+    }
+
+    const res = await fetch('http://localhost:8000/backtest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      setBacktestResult(json);
+    } else {
+      console.error('Backtest error:', await res.text());
     }
   };
 
@@ -49,26 +62,19 @@ function App() {
       <Typography variant="h5" gutterBottom>
         Upload OHLCV Data
       </Typography>
-
       <UploadCSV onUploadSuccess={handleUploadSuccess} />
 
       {uploadedData && (
-        <StrategySelector onRunBacktest={handleRunBacktest} />
-      )}
-
-      {backtestResult?.chart_data && (
-        <BacktestChart data={backtestResult.chart_data} strategy={strategy} />
-      )}
-      {backtestResult?.equity_curve && (
-        <EquityCurveChart data={backtestResult.equity_curve} />
+        <>
+          <StrategySelector onRunBacktest={handleRunBacktest} />
+          {strategy === 'custom' && <StrategyBuilder onBuild={handleCustomLogic} />}
+        </>
       )}
 
       {backtestResult && (
-        <PerformanceMetrics result={backtestResult} />
-      )}
-      {backtestResult?.trades && (
-        <BacktestTable trades={backtestResult.trades} />
-      )}
+        <AnalyticsDashboard result={backtestResult} strategy={strategy} />
+        )}
+
     </Layout>
   );
 }
