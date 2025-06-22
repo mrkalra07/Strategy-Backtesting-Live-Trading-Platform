@@ -6,6 +6,7 @@ import BacktestTable from './components/BacktestTable';
 import BacktestChart from './components/BacktestChart';
 import { Typography } from '@mui/material';
 import PerformanceMetrics from './components/PerformanceMetrics';
+import EquityCurveChart from './components/EquityCurveChart';
 
 
 function App() {
@@ -58,6 +59,10 @@ function App() {
       {backtestResult?.chart_data && (
         <BacktestChart data={backtestResult.chart_data} strategy={strategy} />
       )}
+      {backtestResult?.equity_curve && (
+        <EquityCurveChart data={backtestResult.equity_curve} />
+      )}
+
       {backtestResult && (
         <PerformanceMetrics result={backtestResult} />
       )}

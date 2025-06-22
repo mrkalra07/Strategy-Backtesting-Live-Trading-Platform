@@ -5,7 +5,7 @@ const StrategySelector = ({ onRunBacktest }) => {
   const [strategy, setStrategy] = useState('ema');
 
   const handleRun = () => {
-     console.log("Running backtest with:", strategy);
+    console.log("Running backtest with:", strategy);
     onRunBacktest(strategy);
   };
 
@@ -20,6 +20,7 @@ const StrategySelector = ({ onRunBacktest }) => {
         >
           <MenuItem value="ema">EMA</MenuItem>
           <MenuItem value="rsi">RSI</MenuItem>
+          <MenuItem value="macd">MACD</MenuItem>
         </Select>
       </FormControl>
 
