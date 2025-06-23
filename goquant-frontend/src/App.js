@@ -20,40 +20,45 @@ function App() {
     setUploadedData(data);
   };
 
-  const handleCustomLogic = (logic) => {
-    setCustomLogic(logic);
-  };
   const handleCustomStrategy = (logic) => {
-  console.log("🛠️ Custom strategy built:", logic);
-  setCustomLogic(logic);
-  handleRunBacktest('custom'); // Run backtest immediately!
-};
+    console.log("🛠️ Custom strategy built:", logic);
+    setCustomLogic(logic);
+    handleRunBacktest({ strategy: 'custom' });
+  };
 
-  const handleRunBacktest = async (selectedStrategy) => {
+  const handleRunBacktest = async (config) => {
+    const selectedStrategy = config.strategy;
     setStrategy(selectedStrategy);
 
     const payload = {
-      strategy: selectedStrategy,
+      ...config,
       data: uploadedData,
     };
+
     if (selectedStrategy === 'custom') {
       if (!customLogic) {
-        alert('Please build your custom strategy first.');
+        console.warn("⚠️ No custom logic provided.");
         return;
       }
       payload.logic = customLogic;
     }
 
-    const res = await fetch('http://localhost:8000/backtest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (res.ok) {
-      const json = await res.json();
-      setBacktestResult(json);
-    } else {
-      console.error('Backtest error:', await res.text());
+    try {
+      const res = await fetch('http://localhost:8000/backtest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setBacktestResult(result);
+        console.log('✅ Backtest completed');
+      } else {
+        console.error('❌ Backtest failed with status:', res.status);
+      }
+    } catch (err) {
+      console.error('❌ Error during backtest:', err);
     }
   };
 
@@ -67,14 +72,13 @@ function App() {
       {uploadedData && (
         <>
           <StrategySelector onRunBacktest={handleRunBacktest} />
-          {strategy === 'custom' && <StrategyBuilder onBuild={handleCustomLogic} />}
+          {strategy === 'custom' && <StrategyBuilder onBuild={handleCustomStrategy} />}
         </>
       )}
 
       {backtestResult && (
         <AnalyticsDashboard result={backtestResult} strategy={strategy} />
-        )}
-
+      )}
     </Layout>
   );
 }

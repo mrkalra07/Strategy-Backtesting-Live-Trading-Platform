@@ -1,5 +1,5 @@
 import React from 'react';
-import { Typography, Divider } from '@mui/material';
+import { Typography, Divider, Button } from '@mui/material';
 import BacktestChart from './BacktestChart';
 import EquityCurveChart from './EquityCurveChart';
 import PerformanceMetrics from './PerformanceMetrics';
@@ -7,6 +7,25 @@ import BacktestTable from './BacktestTable';
 
 const AnalyticsDashboard = ({ result, strategy }) => {
   if (!result) return null;
+
+  const downloadCSV = () => {
+    const trades = result?.trades || [];
+    if (trades.length === 0) return;
+
+    const headers = Object.keys(trades[0]).join(',');
+    const rows = trades.map(trade =>
+      Object.values(trade).map(val => `"${val}"`).join(',')
+    );
+    const csvContent = [headers, ...rows].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'trades_log.csv');
+    link.click();
+  };
 
   return (
     <div style={{ marginTop: 32 }}>
@@ -25,6 +44,14 @@ const AnalyticsDashboard = ({ result, strategy }) => {
 
       <Divider style={{ margin: '20px 0' }} />
       <Typography variant="h6">📋 Trade History</Typography>
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={downloadCSV}
+        style={{ marginBottom: '12px' }}
+      >
+        Download Trade Log CSV
+      </Button>
       <BacktestTable trades={result.trades} />
     </div>
   );
