@@ -1,37 +1,76 @@
 import React from 'react';
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
-} from 'recharts';
-import { Typography } from '@mui/material';
+import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, ReferenceDot, Label } from 'recharts';
 
-const BacktestChart = ({ data, strategy }) => {
+const BacktestChart = ({ data, strategy, trades = [] }) => {
+  if (!data || data.length === 0) return null;
+
+  // Parse date strings into Date objects for sorting consistency
+  const parsedData = data.map(d => ({
+    ...d,
+    date: new Date(d.date),
+  }));
+
+  const formattedData = parsedData.map(d => ({
+    ...d,
+    date: d.date.toISOString().split('T')[0], // Format for x-axis
+  }));
+
   return (
-    <>
-      <Typography variant="h6" gutterBottom>
-        Price Chart with {strategy?.toUpperCase()}
-      </Typography>
-      <ResponsiveContainer width="100%" height={400}>
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
+    <div style={{ width: '100%', height: 400 }}>
+      <ResponsiveContainer>
+        <LineChart data={formattedData}>
+          <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
           <XAxis dataKey="date" />
           <YAxis />
           <Tooltip />
-          <Legend />
-          <Line type="monotone" dataKey="price" stroke="#007bff" name="Price" />
-
-          {strategy === 'ema' && (
-            <>
-              <Line type="monotone" dataKey="ema_short" stroke="#f54291" name="EMA Short" />
-              <Line type="monotone" dataKey="ema_long" stroke="#9b59b6" name="EMA Long" />
-            </>
+          <Line type="monotone" dataKey="price" stroke="#8884d8" name="Price" dot />
+          {strategy === 'MACD' && (
+            <Line type="monotone" dataKey="macd" stroke="#FFA500" name="MACD" dot />
           )}
 
-          {strategy === 'rsi' && (
-            <Line type="monotone" dataKey="rsi" stroke="#00b894" name="RSI" />
-          )}
+          {/* Trade Markers */}
+   {trades.map((trade, index) => {
+  const {
+    entry_time,
+    entry_price,
+    exit_time,
+    exit_price
+  } = trade;
+
+  return (
+    <React.Fragment key={index}>
+      {/* Entry Marker (Green Dot) */}
+      {entry_time && entry_price !== undefined && (
+        <ReferenceDot
+          x={entry_time}
+          y={entry_price}
+          r={5}
+          fill="green"
+          stroke="black"
+          strokeWidth={1}
+        />
+      )}
+
+      {/* Exit Marker (Red Dot) */}
+      {exit_time && exit_price !== undefined && (
+        <ReferenceDot
+          x={exit_time}
+          y={exit_price}
+          r={5}
+          fill="red"
+          stroke="black"
+          strokeWidth={1}
+        />
+      )}
+    </React.Fragment>
+  );
+})}
+
+
+
         </LineChart>
       </ResponsiveContainer>
-    </>
+    </div>
   );
 };
 

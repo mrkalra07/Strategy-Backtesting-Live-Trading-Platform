@@ -31,6 +31,14 @@ const PerformanceMetrics = ({ result }) => {
       <Typography variant="h6" gutterBottom>
         📊 Performance Metrics
       </Typography>
+      <Typography variant="body1" style={{ marginBottom: 16 }}>
+        📈 <strong>Cumulative Return:</strong>{' '}
+        {result.trades.length > 0 && result.trades[0].entry_price
+          ? `${((result.total_profit / result.trades[0].entry_price) * 100).toFixed(2)}%`
+          : 'N/A'}
+      </Typography>
+
+
       <Grid container spacing={2}>
         <Grid item xs={6} md={3}><MetricCard label="Total Profit" value={formatNumber(total_profit)} /></Grid>
         <Grid item xs={6} md={3}><MetricCard label="Avg Trade Profit" value={formatNumber(avg_trade_profit)} /></Grid>

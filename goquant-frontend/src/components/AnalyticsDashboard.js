@@ -4,6 +4,9 @@ import BacktestChart from './BacktestChart';
 import EquityCurveChart from './EquityCurveChart';
 import PerformanceMetrics from './PerformanceMetrics';
 import BacktestTable from './BacktestTable';
+import DrawdownChart from './DrawdownChart';
+import TradeReturnsChart from './TradeReturnsChart';
+import PnLChart from './PnLChart';
 
 const AnalyticsDashboard = ({ result, strategy }) => {
   if (!result) return null;
@@ -33,11 +36,15 @@ const AnalyticsDashboard = ({ result, strategy }) => {
 
       <Divider style={{ margin: '20px 0' }} />
       <Typography variant="h6">📌 Strategy Chart</Typography>
-      <BacktestChart data={result.chart_data} strategy={strategy} />
+      <BacktestChart data={result.chart_data} strategy={strategy} trades={result.trades} />
 
       <Divider style={{ margin: '20px 0' }} />
       <Typography variant="h6">💹 Equity Curve</Typography>
-      <EquityCurveChart data={result.equity_curve} />
+      <EquityCurveChart data={result.equity_curve} trades={result.trades} />
+
+      <Divider style={{ margin: '20px 0' }} />
+      <Typography variant="h6">📉 Drawdown Over Time</Typography>
+      <DrawdownChart data={result.drawdown_curve} />
 
       <Divider style={{ margin: '20px 0' }} />
       <PerformanceMetrics result={result} />
@@ -52,6 +59,13 @@ const AnalyticsDashboard = ({ result, strategy }) => {
       >
         Download Trade Log CSV
       </Button>
+      <Divider style={{ margin: '20px 0' }} />
+    <Typography variant="h6">📉 Trade Return Distribution</Typography>
+    <TradeReturnsChart trades={result.trades} />
+
+    <Divider style={{ margin: '20px 0' }} />
+    <Typography variant="h6">📈 Profit & Loss Over Time</Typography>
+    <PnLChart trades={result.trades} />
       <BacktestTable trades={result.trades} />
     </div>
   );

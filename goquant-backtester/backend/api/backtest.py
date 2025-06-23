@@ -24,10 +24,15 @@ async def run_backtest(request: Request):
     data = payload.get("data")
     custom_logic = payload.get("logic")
 
+    # New optional params
+    sl = payload.get("sl")              # e.g. 0.02 (2%)
+    tp = payload.get("tp")              # e.g. 0.05 (5%)
+    fees = payload.get("fees", 0.0)     # default 0%
+    slippage = payload.get("slippage", 0.0)  # default 0%
+
     if not data:
         raise HTTPException(status_code=400, detail="No OHLCV data provided.")
 
-    # Generate signals
     if strategy == "ema":
         signals = generate_ema_signals(data)
     elif strategy == "rsi":
@@ -41,7 +46,6 @@ async def run_backtest(request: Request):
     else:
         raise HTTPException(status_code=400, detail="Unsupported strategy.")
 
-    # Backtest logic
     trades = []
     equity_curve = []
     returns = []
@@ -52,35 +56,63 @@ async def run_backtest(request: Request):
     chart_data = []
 
     for idx, row in enumerate(signals):
+        # Chart indicator
+        indicator_value = row.get("rsi") or row.get("ema_short") or row.get("macd")
         chart_data.append({
             "date": row["timestamp"],
             "price": row["close"],
-            "indicator": row.get("rsi") or row.get("ema_short") or row.get("macd")
+            "indicator": indicator_value
         })
 
+        # Entry logic
         if row["signal"] == 1 and position is None:
             position = "long"
-            entry_price = row["close"]
+            entry_price = row["close"] * (1 + slippage)  # Apply slippage on buy
             entry_index = idx
-            trades.append({"action": "buy", "timestamp": row["timestamp"], "price": row["close"]})
-
-        elif row["signal"] == -1 and position == "long":
-            position = None
-            exit_price = row["close"]
-            holding_time = idx - entry_index
-            profit = exit_price - entry_price
-            ret = (exit_price - entry_price) / entry_price
-            returns.append(ret)
-            current_equity += profit
-            equity_curve.append(current_equity)
             trades.append({
-                "action": "sell",
+                "action": "buy",
                 "timestamp": row["timestamp"],
-                "price": exit_price,
-                "profit": profit,
-                "return": ret,
-                "holding_time": holding_time
+                "price": row["close"],
+                "entry_price": entry_price,
+                "entry_time": row["timestamp"]
             })
+
+        # Exit logic
+        elif position == "long":
+            exit_raw_price = row["close"]
+            exit_price = exit_raw_price * (1 - slippage)  # Apply slippage on sell
+
+            hit_sl = sl and exit_price <= entry_price * (1 - sl)
+            hit_tp = tp and exit_price >= entry_price * (1 + tp)
+            is_exit_signal = row["signal"] == -1
+            should_exit = is_exit_signal or hit_sl or hit_tp
+
+            if should_exit:
+                position = None
+                holding_time = idx - entry_index
+                gross_profit = exit_price - entry_price
+                fee_cost = (entry_price + exit_price) * fees
+                net_profit = gross_profit - fee_cost
+                ret = net_profit / entry_price
+                returns.append(ret)
+                current_equity += net_profit
+                equity_curve.append(current_equity)
+                trades.append({
+                    "action": "sell",
+                    "timestamp": row["timestamp"],
+                    "price": exit_raw_price,
+                    "exit_price": exit_price,
+                    "entry_price": entry_price,
+                    "entry_time": signals[entry_index]["timestamp"],
+                    "exit_time": row["timestamp"],
+                    "profit": net_profit,
+                    "return": ret,
+                    "holding_time": holding_time,
+                    "sl_hit": hit_sl,
+                    "tp_hit": hit_tp,
+                    "signal_exit": is_exit_signal,
+                    "fee": fee_cost
+                })
 
     # Metrics
     total_profit = sum(t.get("profit", 0) for t in trades if "profit" in t)
@@ -99,7 +131,7 @@ async def run_backtest(request: Request):
             drawdown = peak - val
             max_drawdown = max(max_drawdown, drawdown)
 
-    # Advanced Metrics
+    # Advanced metrics
     returns_array = np.array(returns)
     if len(returns_array) > 1:
         sharpe_ratio = np.mean(returns_array) / np.std(returns_array)
@@ -109,10 +141,9 @@ async def run_backtest(request: Request):
     else:
         sharpe_ratio = sortino_ratio = profit_factor = np.nan
 
-    # Max consecutive wins/losses
+    # Consecutive win/loss tracking
     max_consecutive_wins = max_consecutive_losses = 0
     current_win = current_loss = 0
-
     for t in trades:
         if "profit" in t:
             if t["profit"] > 0:
@@ -124,14 +155,23 @@ async def run_backtest(request: Request):
             max_consecutive_wins = max(max_consecutive_wins, current_win)
             max_consecutive_losses = max(max_consecutive_losses, current_loss)
 
+    # Equity & drawdown curve
     equity_data = []
+    drawdown_curve = []
     cumulative_equity = 0
+    peak_equity = 0
     for trade in trades:
         if "profit" in trade:
             cumulative_equity += trade["profit"]
+        peak_equity = max(peak_equity, cumulative_equity)
+        drawdown = peak_equity - cumulative_equity
         equity_data.append({
             "date": trade["timestamp"],
             "equity": cumulative_equity
+        })
+        drawdown_curve.append({
+            "date": trade["timestamp"],
+            "drawdown": drawdown
         })
 
     result = {
@@ -143,6 +183,7 @@ async def run_backtest(request: Request):
         "max_drawdown": max_drawdown,
         "chart_data": chart_data,
         "equity_curve": equity_data,
+        "drawdown_curve": drawdown_curve,
         "sharpe_ratio": sharpe_ratio,
         "sortino_ratio": sortino_ratio,
         "profit_factor": profit_factor,
