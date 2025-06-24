@@ -123,13 +123,10 @@ async def run_backtest(request: Request):
     asset_returns = df["close"].pct_change().dropna()
 
     # MOCK benchmark returns: Replace this with real benchmark OHLCV and returns
-    # For now, we just use asset_returns itself so beta = 1.0
     benchmark_returns = asset_returns.copy()
 
-    # Compute VaR 95%
     var_95 = np.percentile(asset_returns, 5)
 
-    # Compute Beta
     if len(asset_returns) > 1 and len(benchmark_returns) > 1:
         covariance = np.cov(asset_returns, benchmark_returns)[0, 1]
         benchmark_variance = np.var(benchmark_returns)
@@ -137,7 +134,7 @@ async def run_backtest(request: Request):
     else:
         beta = np.nan
 
-    # Calculate max drawdown
+    # Max drawdown
     max_drawdown = 0
     if equity_curve:
         peak = equity_curve[0]
@@ -147,7 +144,7 @@ async def run_backtest(request: Request):
             drawdown = peak - val
             max_drawdown = max(max_drawdown, drawdown)
 
-    # Risk Metrics: Sharpe, Sortino, Profit factor (reuse your previous code)
+    # Sharpe, Sortino, Profit factor
     returns_array = np.array(returns)
     if len(returns_array) > 1:
         sharpe_ratio = np.mean(returns_array) / np.std(returns_array)
@@ -171,7 +168,7 @@ async def run_backtest(request: Request):
             max_consecutive_wins = max(max_consecutive_wins, current_win)
             max_consecutive_losses = max(max_consecutive_losses, current_loss)
 
-    # Equity and drawdown curve points
+    # Equity and drawdown points
     equity_data = []
     drawdown_curve = []
     cumulative_equity = 0
@@ -190,13 +187,13 @@ async def run_backtest(request: Request):
             "drawdown": drawdown
         })
 
-    # Rolling Calmar ratio over last 20 trades (window can be adjusted)
+    # Rolling Calmar
     rolling_calmar = []
     window = 20
     equity_vals = [point['equity'] for point in equity_data]
 
     for i in range(window, len(equity_vals)):
-        window_slice = equity_vals[i-window:i]
+        window_slice = equity_vals[i - window:i]
         ret = window_slice[-1] - window_slice[0]
         max_dd = max(window_slice) - min(window_slice)
         calmar_val = (ret / max_dd) if max_dd > 0 else 0
@@ -205,12 +202,28 @@ async def run_backtest(request: Request):
             "calmar": calmar_val
         })
 
+    # ✅ Turnover and Leverage
+    entry_prices_sum = sum(t["entry_price"] for t in trades if t["action"] == "buy")
+    num_entries = len([t for t in trades if t["action"] == "buy"])
+    avg_capital_deployed = entry_prices_sum / num_entries if num_entries else 1
+
+    turnover = entry_prices_sum / avg_capital_deployed if avg_capital_deployed else 0
+
+    gross_exposure = sum(
+        t["entry_price"] for t in trades if t["action"] == "buy"
+    ) + sum(
+        t.get("exit_price", 0) for t in trades if t["action"] == "sell"
+    )
+
+    net_equity = sum(t.get("profit", 0) for t in trades if "profit" in t)
+    leverage = gross_exposure / net_equity if net_equity != 0 else 0
+
     result = {
         "trades": trades,
         "chart_data": chart_data,
         "equity_curve": equity_data,
         "drawdown_curve": drawdown_curve,
-        "total_profit": sum(t.get("profit", 0) for t in trades if "profit" in t),
+        "total_profit": net_equity,
         "num_trades": len([t for t in trades if t["action"] == "sell"]),
         "avg_trade_profit": np.mean([t.get("profit", 0) for t in trades if "profit" in t]) if trades else 0,
         "win_rate": (len([t for t in trades if t.get("profit", 0) > 0]) / len([t for t in trades if t["action"] == "sell"])) * 100 if trades else 0,
@@ -222,7 +235,9 @@ async def run_backtest(request: Request):
         "max_consecutive_losses": max_consecutive_losses,
         "var_95": var_95,
         "beta": beta,
-        "calmar_over_time": rolling_calmar
+        "calmar_over_time": rolling_calmar,
+        "turnover": turnover,
+        "leverage": leverage,
     }
 
     return JSONResponse(content=clean_json(result))

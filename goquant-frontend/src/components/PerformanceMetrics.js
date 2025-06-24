@@ -27,6 +27,8 @@ const PerformanceMetrics = ({ result }: { result: any }) => {
     var_95,
     beta,
     calmar_ratio,
+    turnover,
+    leverage,
   } = result;
 
   return (
@@ -34,6 +36,7 @@ const PerformanceMetrics = ({ result }: { result: any }) => {
       <Typography variant="h6" gutterBottom>
         📊 Performance Metrics
       </Typography>
+
       <Typography variant="body1" style={{ marginBottom: 16 }}>
         📈 <strong>Cumulative Return:</strong>{' '}
         {result.trades.length > 0 && result.trades[0].entry_price
@@ -54,10 +57,14 @@ const PerformanceMetrics = ({ result }: { result: any }) => {
         <Grid item xs={6} md={3}><MetricCard label="Max Consecutive Losses" value={max_consecutive_losses ?? 0} /></Grid>
         <Grid item xs={6} md={3}><MetricCard label="Number of Trades" value={num_trades ?? 0} /></Grid>
 
-        {/* New risk metrics */}
+        {/* New Risk Metrics */}
         <Grid item xs={6} md={3}><MetricCard label="VaR (95%)" value={var_95 !== undefined && var_95 !== null ? `${(var_95 * 100).toFixed(2)}%` : 'N/A'} /></Grid>
         <Grid item xs={6} md={3}><MetricCard label="Beta" value={beta !== undefined && beta !== null ? beta.toFixed(3) : 'N/A'} /></Grid>
         <Grid item xs={6} md={3}><MetricCard label="Calmar Ratio" value={formatNumber(calmar_ratio)} /></Grid>
+
+        {/* ✅ New Metrics */}
+        <Grid item xs={6} md={3}><MetricCard label="Turnover" value={formatNumber(turnover)} /></Grid>
+        <Grid item xs={6} md={3}><MetricCard label="Leverage" value={formatNumber(leverage)} /></Grid>
       </Grid>
     </div>
   );
