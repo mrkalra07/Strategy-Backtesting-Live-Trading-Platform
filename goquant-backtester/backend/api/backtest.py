@@ -5,6 +5,7 @@ from backend.strategy.rsi_strategy import generate_rsi_signals
 from backend.strategy.macd_strategy import generate_macd_signals
 from backend.strategy.custom_logic import evaluate_custom_logic
 import numpy as np
+import pandas as pd
 
 router = APIRouter()
 
@@ -32,6 +33,7 @@ async def run_backtest(request: Request):
     if not data:
         raise HTTPException(status_code=400, detail="No OHLCV data provided.")
 
+    # Generate signals per strategy
     if strategy == "ema":
         signals = generate_ema_signals(data)
     elif strategy == "rsi":
@@ -112,12 +114,30 @@ async def run_backtest(request: Request):
                     "fee": fee_cost
                 })
 
-    total_profit = sum(t.get("profit", 0) for t in trades if "profit" in t)
-    total_trades = len([t for t in trades if t["action"] == "sell"])
-    avg_profit = total_profit / total_trades if total_trades > 0 else 0
-    win_rate = (len([t for t in trades if t.get("profit", 0) > 0]) / total_trades) * 100 if total_trades else 0
-    average_holding_time = sum(t.get("holding_time", 0) for t in trades if "holding_time" in t) / total_trades if total_trades else 0
+    # Prepare OHLCV DataFrame for metrics
+    df = pd.DataFrame(data)
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df.set_index("timestamp", inplace=True)
 
+    # Calculate returns for VaR, Beta, etc
+    asset_returns = df["close"].pct_change().dropna()
+
+    # MOCK benchmark returns: Replace this with real benchmark OHLCV and returns
+    # For now, we just use asset_returns itself so beta = 1.0
+    benchmark_returns = asset_returns.copy()
+
+    # Compute VaR 95%
+    var_95 = np.percentile(asset_returns, 5)
+
+    # Compute Beta
+    if len(asset_returns) > 1 and len(benchmark_returns) > 1:
+        covariance = np.cov(asset_returns, benchmark_returns)[0, 1]
+        benchmark_variance = np.var(benchmark_returns)
+        beta = covariance / benchmark_variance if benchmark_variance != 0 else np.nan
+    else:
+        beta = np.nan
+
+    # Calculate max drawdown
     max_drawdown = 0
     if equity_curve:
         peak = equity_curve[0]
@@ -127,6 +147,7 @@ async def run_backtest(request: Request):
             drawdown = peak - val
             max_drawdown = max(max_drawdown, drawdown)
 
+    # Risk Metrics: Sharpe, Sortino, Profit factor (reuse your previous code)
     returns_array = np.array(returns)
     if len(returns_array) > 1:
         sharpe_ratio = np.mean(returns_array) / np.std(returns_array)
@@ -136,6 +157,7 @@ async def run_backtest(request: Request):
     else:
         sharpe_ratio = sortino_ratio = profit_factor = np.nan
 
+    # Max consecutive wins/losses
     max_consecutive_wins = max_consecutive_losses = 0
     current_win = current_loss = 0
     for t in trades:
@@ -149,6 +171,7 @@ async def run_backtest(request: Request):
             max_consecutive_wins = max(max_consecutive_wins, current_win)
             max_consecutive_losses = max(max_consecutive_losses, current_loss)
 
+    # Equity and drawdown curve points
     equity_data = []
     drawdown_curve = []
     cumulative_equity = 0
@@ -167,22 +190,39 @@ async def run_backtest(request: Request):
             "drawdown": drawdown
         })
 
+    # Rolling Calmar ratio over last 20 trades (window can be adjusted)
+    rolling_calmar = []
+    window = 20
+    equity_vals = [point['equity'] for point in equity_data]
+
+    for i in range(window, len(equity_vals)):
+        window_slice = equity_vals[i-window:i]
+        ret = window_slice[-1] - window_slice[0]
+        max_dd = max(window_slice) - min(window_slice)
+        calmar_val = (ret / max_dd) if max_dd > 0 else 0
+        rolling_calmar.append({
+            "date": equity_data[i]["date"],
+            "calmar": calmar_val
+        })
+
     result = {
         "trades": trades,
-        "total_profit": total_profit,
-        "num_trades": total_trades,
-        "avg_trade_profit": avg_profit,
-        "win_rate": win_rate,
-        "max_drawdown": max_drawdown,
         "chart_data": chart_data,
         "equity_curve": equity_data,
         "drawdown_curve": drawdown_curve,
+        "total_profit": sum(t.get("profit", 0) for t in trades if "profit" in t),
+        "num_trades": len([t for t in trades if t["action"] == "sell"]),
+        "avg_trade_profit": np.mean([t.get("profit", 0) for t in trades if "profit" in t]) if trades else 0,
+        "win_rate": (len([t for t in trades if t.get("profit", 0) > 0]) / len([t for t in trades if t["action"] == "sell"])) * 100 if trades else 0,
+        "max_drawdown": max_drawdown,
         "sharpe_ratio": sharpe_ratio,
         "sortino_ratio": sortino_ratio,
         "profit_factor": profit_factor,
-        "average_holding_time": average_holding_time,
         "max_consecutive_wins": max_consecutive_wins,
-        "max_consecutive_losses": max_consecutive_losses
+        "max_consecutive_losses": max_consecutive_losses,
+        "var_95": var_95,
+        "beta": beta,
+        "calmar_over_time": rolling_calmar
     }
 
     return JSONResponse(content=clean_json(result))

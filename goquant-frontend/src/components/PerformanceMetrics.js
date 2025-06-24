@@ -1,17 +1,17 @@
 import React from 'react';
 import { Grid, Paper, Typography } from '@mui/material';
 
-const MetricCard = ({ label, value }) => (
+const MetricCard = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <Paper style={{ padding: 16, textAlign: 'center' }}>
     <Typography variant="subtitle2">{label}</Typography>
     <Typography variant="h6" color="primary">{value}</Typography>
   </Paper>
 );
 
-const formatNumber = (val, fallback = 'N/A') =>
-  typeof val === 'number' ? val.toFixed(2) : fallback;
+const formatNumber = (val: number | null | undefined, fallback = 'N/A') =>
+  typeof val === 'number' && !isNaN(val) ? val.toFixed(2) : fallback;
 
-const PerformanceMetrics = ({ result }) => {
+const PerformanceMetrics = ({ result }: { result: any }) => {
   const {
     total_profit,
     num_trades,
@@ -23,7 +23,10 @@ const PerformanceMetrics = ({ result }) => {
     profit_factor,
     average_holding_time,
     max_consecutive_wins,
-    max_consecutive_losses
+    max_consecutive_losses,
+    var_95,
+    beta,
+    calmar_ratio,
   } = result;
 
   return (
@@ -34,10 +37,9 @@ const PerformanceMetrics = ({ result }) => {
       <Typography variant="body1" style={{ marginBottom: 16 }}>
         📈 <strong>Cumulative Return:</strong>{' '}
         {result.trades.length > 0 && result.trades[0].entry_price
-          ? `${((result.total_profit / result.trades[0].entry_price) * 100).toFixed(2)}%`
+          ? `${((total_profit / result.trades[0].entry_price) * 100).toFixed(2)}%`
           : 'N/A'}
       </Typography>
-
 
       <Grid container spacing={2}>
         <Grid item xs={6} md={3}><MetricCard label="Total Profit" value={formatNumber(total_profit)} /></Grid>
@@ -51,6 +53,11 @@ const PerformanceMetrics = ({ result }) => {
         <Grid item xs={6} md={3}><MetricCard label="Max Consecutive Wins" value={max_consecutive_wins ?? 0} /></Grid>
         <Grid item xs={6} md={3}><MetricCard label="Max Consecutive Losses" value={max_consecutive_losses ?? 0} /></Grid>
         <Grid item xs={6} md={3}><MetricCard label="Number of Trades" value={num_trades ?? 0} /></Grid>
+
+        {/* New risk metrics */}
+        <Grid item xs={6} md={3}><MetricCard label="VaR (95%)" value={var_95 !== undefined && var_95 !== null ? `${(var_95 * 100).toFixed(2)}%` : 'N/A'} /></Grid>
+        <Grid item xs={6} md={3}><MetricCard label="Beta" value={beta !== undefined && beta !== null ? beta.toFixed(3) : 'N/A'} /></Grid>
+        <Grid item xs={6} md={3}><MetricCard label="Calmar Ratio" value={formatNumber(calmar_ratio)} /></Grid>
       </Grid>
     </div>
   );
