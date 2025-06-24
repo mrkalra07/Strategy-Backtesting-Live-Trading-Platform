@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+
 import Layout from './components/Layout';
 import UploadCSV from './components/UploadCSV';
 import StrategySelector from './components/StrategySelector';
-import StrategyBuilder from './components/StrategyBuilder';
-import BacktestChart from './components/BacktestChart';
-import EquityCurveChart from './components/EquityCurveChart';
-import PerformanceMetrics from './components/PerformanceMetrics';
-import BacktestTable from './components/BacktestTable';
-import { Typography } from '@mui/material';
+import StrategyBuilder from './components/StrategyBuilder/StrategyBuilder';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import LiveTradingDashboard from './components/LiveTradingDashboard';
+
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
+
+import { Typography } from '@mui/material';
 
 function App() {
   const [uploadedData, setUploadedData] = useState(null);
@@ -44,6 +47,7 @@ function App() {
     }
 
     try {
+      console.log("📤 Sending payload to backend:", payload);
       const res = await fetch('http://localhost:8000/backtest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,23 +67,37 @@ function App() {
   };
 
   return (
-    <Layout>
-      <Typography variant="h5" gutterBottom>
-        Upload OHLCV Data
-      </Typography>
-      <UploadCSV onUploadSuccess={handleUploadSuccess} />
+    <DndProvider backend={HTML5Backend}>
+      <Router>
+        <Layout>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <>
+                  <Typography variant="h5" gutterBottom>
+                    Upload OHLCV Data
+                  </Typography>
+                  <UploadCSV onUploadSuccess={handleUploadSuccess} />
 
-      {uploadedData && (
-        <>
-          <StrategySelector onRunBacktest={handleRunBacktest} />
-          {strategy === 'custom' && <StrategyBuilder onBuild={handleCustomStrategy} />}
-        </>
-      )}
+                  {uploadedData && (
+                    <>
+                      <StrategySelector onRunBacktest={handleRunBacktest} />
+                      <StrategyBuilder onBuild={handleCustomStrategy} />
+                    </>
+                  )}
 
-      {backtestResult && (
-        <AnalyticsDashboard result={backtestResult} strategy={strategy} />
-      )}
-    </Layout>
+                  {backtestResult && (
+                    <AnalyticsDashboard result={backtestResult} strategy={strategy} />
+                  )}
+                </>
+              }
+            />
+            <Route path="/live-trading" element={<LiveTradingDashboard />} />
+          </Routes>
+        </Layout>
+      </Router>
+    </DndProvider>
   );
 }
 

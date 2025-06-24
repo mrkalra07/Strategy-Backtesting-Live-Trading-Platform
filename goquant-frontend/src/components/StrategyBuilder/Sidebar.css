@@ -1,0 +1,11 @@
+aside {
+  padding: 10px;
+}
+
+aside > div {
+  padding: 10px;
+  border: 1px solid #aaa;
+  margin-bottom: 8px;
+  cursor: grab;
+  background-color: white;
+}

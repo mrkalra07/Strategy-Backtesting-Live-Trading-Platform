@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { Button, FormControl, InputLabel, MenuItem, Select, TextField, Typography, Grid } from '@mui/material';
+import {
+  Button,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  TextField,
+  Grid
+} from '@mui/material';
 
 const StrategySelector = ({ onRunBacktest }) => {
   const [strategy, setStrategy] = useState('ema');
@@ -9,9 +17,19 @@ const StrategySelector = ({ onRunBacktest }) => {
   const [takeProfit, setTakeProfit] = useState(0.04);  // 4%
 
   const handleRun = () => {
+    if (strategy === "custom") {
+      alert("⚠️ Custom strategy is currently disabled.");
+      return;
+    }
+
     console.log("Running backtest with:", {
-      strategy, slippage, fees, stopLoss, takeProfit
+      strategy,
+      slippage,
+      fees,
+      stopLoss,
+      takeProfit
     });
+
     onRunBacktest({
       strategy,
       slippage,
@@ -33,7 +51,7 @@ const StrategySelector = ({ onRunBacktest }) => {
           <MenuItem value="ema">EMA</MenuItem>
           <MenuItem value="rsi">RSI</MenuItem>
           <MenuItem value="macd">MACD</MenuItem>
-          <MenuItem value="custom">Custom</MenuItem>
+          {/* Removed: <MenuItem value="custom">Custom</MenuItem> */}
         </Select>
       </FormControl>
 

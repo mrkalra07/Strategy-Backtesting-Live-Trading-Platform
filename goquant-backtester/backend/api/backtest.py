@@ -1,9 +1,9 @@
+#backtest.py
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from backend.strategy.ema_strategy import generate_ema_signals
 from backend.strategy.rsi_strategy import generate_rsi_signals
 from backend.strategy.macd_strategy import generate_macd_signals
-from backend.strategy.custom_logic_engine import parse_and_execute_custom_logic
 import numpy as np
 
 router = APIRouter()
@@ -24,11 +24,10 @@ async def run_backtest(request: Request):
     data = payload.get("data")
     custom_logic = payload.get("logic")
 
-    # New optional params
-    sl = payload.get("sl")              # e.g. 0.02 (2%)
-    tp = payload.get("tp")              # e.g. 0.05 (5%)
-    fees = payload.get("fees", 0.0)     # default 0%
-    slippage = payload.get("slippage", 0.0)  # default 0%
+    sl = payload.get("sl")
+    tp = payload.get("tp")
+    fees = payload.get("fees", 0.0)
+    slippage = payload.get("slippage", 0.0)
 
     if not data:
         raise HTTPException(status_code=400, detail="No OHLCV data provided.")
@@ -40,9 +39,11 @@ async def run_backtest(request: Request):
     elif strategy == "macd":
         signals = generate_macd_signals(data)
     elif strategy == "custom":
-        if not custom_logic:
-            raise HTTPException(status_code=400, detail="Missing custom logic.")
-        signals = parse_and_execute_custom_logic(data, custom_logic)
+        try:
+            from backend.strategy.custom_logic import evaluate_custom_logic
+            signals = evaluate_custom_logic(data, custom_logic)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error in custom strategy: {str(e)}")
     else:
         raise HTTPException(status_code=400, detail="Unsupported strategy.")
 
