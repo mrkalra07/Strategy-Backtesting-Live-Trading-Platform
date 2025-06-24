@@ -1,9 +1,9 @@
-#backtest.py
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from backend.strategy.ema_strategy import generate_ema_signals
 from backend.strategy.rsi_strategy import generate_rsi_signals
 from backend.strategy.macd_strategy import generate_macd_signals
+from backend.strategy.custom_logic import evaluate_custom_logic
 import numpy as np
 
 router = APIRouter()
@@ -40,8 +40,8 @@ async def run_backtest(request: Request):
         signals = generate_macd_signals(data)
     elif strategy == "custom":
         try:
-            from backend.strategy.custom_logic import evaluate_custom_logic
-            signals = evaluate_custom_logic(data, custom_logic)
+            df = evaluate_custom_logic(data, custom_logic)
+            signals = df.to_dict(orient="records")
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Error in custom strategy: {str(e)}")
     else:
@@ -57,7 +57,6 @@ async def run_backtest(request: Request):
     chart_data = []
 
     for idx, row in enumerate(signals):
-        # Chart indicator
         indicator_value = row.get("rsi") or row.get("ema_short") or row.get("macd")
         chart_data.append({
             "date": row["timestamp"],
@@ -65,10 +64,9 @@ async def run_backtest(request: Request):
             "indicator": indicator_value
         })
 
-        # Entry logic
         if row["signal"] == 1 and position is None:
             position = "long"
-            entry_price = row["close"] * (1 + slippage)  # Apply slippage on buy
+            entry_price = row["close"] * (1 + slippage)
             entry_index = idx
             trades.append({
                 "action": "buy",
@@ -78,10 +76,9 @@ async def run_backtest(request: Request):
                 "entry_time": row["timestamp"]
             })
 
-        # Exit logic
         elif position == "long":
             exit_raw_price = row["close"]
-            exit_price = exit_raw_price * (1 - slippage)  # Apply slippage on sell
+            exit_price = exit_raw_price * (1 - slippage)
 
             hit_sl = sl and exit_price <= entry_price * (1 - sl)
             hit_tp = tp and exit_price >= entry_price * (1 + tp)
@@ -115,14 +112,12 @@ async def run_backtest(request: Request):
                     "fee": fee_cost
                 })
 
-    # Metrics
     total_profit = sum(t.get("profit", 0) for t in trades if "profit" in t)
     total_trades = len([t for t in trades if t["action"] == "sell"])
     avg_profit = total_profit / total_trades if total_trades > 0 else 0
     win_rate = (len([t for t in trades if t.get("profit", 0) > 0]) / total_trades) * 100 if total_trades else 0
     average_holding_time = sum(t.get("holding_time", 0) for t in trades if "holding_time" in t) / total_trades if total_trades else 0
 
-    # Drawdown
     max_drawdown = 0
     if equity_curve:
         peak = equity_curve[0]
@@ -132,7 +127,6 @@ async def run_backtest(request: Request):
             drawdown = peak - val
             max_drawdown = max(max_drawdown, drawdown)
 
-    # Advanced metrics
     returns_array = np.array(returns)
     if len(returns_array) > 1:
         sharpe_ratio = np.mean(returns_array) / np.std(returns_array)
@@ -142,7 +136,6 @@ async def run_backtest(request: Request):
     else:
         sharpe_ratio = sortino_ratio = profit_factor = np.nan
 
-    # Consecutive win/loss tracking
     max_consecutive_wins = max_consecutive_losses = 0
     current_win = current_loss = 0
     for t in trades:
@@ -156,7 +149,6 @@ async def run_backtest(request: Request):
             max_consecutive_wins = max(max_consecutive_wins, current_win)
             max_consecutive_losses = max(max_consecutive_losses, current_loss)
 
-    # Equity & drawdown curve
     equity_data = []
     drawdown_curve = []
     cumulative_equity = 0

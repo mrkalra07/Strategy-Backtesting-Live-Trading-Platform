@@ -1,41 +1,106 @@
+// src/components/StrategyBuilder/StrategyBuilder.tsx
 import React, { useRef } from 'react';
+import { Card, CardContent, Typography, Box, Button } from '@mui/material';
 import Sidebar from './Sidebar';
 import Canvas from './Canvas';
-import './StrategyBuilder.css';
+import axios from 'axios';
 
-type StrategyBuilderProps = {
-  onBuild: (logic: any) => void;
-};
+// === Types ===
+interface NodeData {
+  id: string;
+  type: string;
+  data: {
+    label?: string;
+    action?: string;
+  };
+}
 
-const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ onBuild }) => {
-  const canvasRef = useRef<any>(null);
+interface EdgeData {
+  id: string;
+  source: string;
+  target: string;
+}
 
-  const handleBuildAndRun = () => {
-    if (canvasRef.current) {
-      const { nodes, edges } = canvasRef.current.getFlowData();
-      console.log('📦 Nodes:', nodes);
-      console.log('🔗 Edges:', edges);
+interface FlowData {
+  nodes: NodeData[];
+  edges: EdgeData[];
+}
 
-      if (nodes.length === 0 || edges.length === 0) {
-        alert('⚠️ Please build a strategy by adding and connecting nodes.');
-        return;
-      }
+interface StrategyBuilderProps {
+  uploadedOHLCVData: any[];
+  onResult: (result: any) => void;
+  sl?: number;
+  tp?: number;
+  fees?: number;
+  slippage?: number;
+}
 
-      const logic = { nodes, edges };
-      onBuild(logic);
+const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
+  uploadedOHLCVData,
+  onResult,
+  sl = 0,
+  tp = 0,
+  fees = 0,
+  slippage = 0,
+}) => {
+  const canvasRef = useRef<{ getFlowData: () => FlowData } | null>(null);
+
+  const buildLogic = () => {
+    if (!canvasRef.current) return;
+    const { nodes, edges } = canvasRef.current.getFlowData();
+
+    if (!nodes.length || !edges.length) {
+      alert('⚠️ Please build and connect logic nodes first.');
+      return;
     }
+
+    const logic = nodes
+      .filter((n) => n.type === 'logicBlock')
+      .map((n) => {
+        const ins = edges
+          .filter((e) => e.target === n.id)
+          .map((e) => {
+            const sourceNode = nodes.find((x) => x.id === e.source);
+            return sourceNode?.data.label || 'Unknown';
+          });
+        return `IF ${ins.join(' AND ')} THEN ${n.data.action?.toUpperCase() || 'BUY'}`;
+      })
+      .join('\n');
+
+    axios
+      .post('http://localhost:8000/backtest', {
+        strategy: 'custom',
+        logic,
+        data: uploadedOHLCVData,
+        sl,
+        tp,
+        fees,
+        slippage,
+      })
+      .then((res) => onResult(res.data))
+      .catch((err) => {
+        console.error(err);
+        alert(err.response?.data?.detail || 'Strategy backtest failed');
+      });
   };
 
   return (
-    <div className="strategy-builder" style={{ display: 'flex', gap: 16, height: '100%' }}>
-      <Sidebar />
-      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-        <Canvas ref={canvasRef} />
-        <div style={{ marginTop: 10 }}>
-          <button onClick={handleBuildAndRun}>⚙️ Build & Run Strategy</button>
-        </div>
-      </div>
-    </div>
+    <Card sx={{ mb: 4 }}>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>
+          Visual Strategy Builder
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2, minHeight: 360 }}>
+          <Sidebar />
+          <Canvas ref={canvasRef} />
+        </Box>
+        <Box textAlign="right" sx={{ mt: 2 }}>
+          <Button variant="contained" onClick={buildLogic}>
+            ⚙️ Build & Run Strategy
+          </Button>
+        </Box>
+      </CardContent>
+    </Card>
   );
 };
 

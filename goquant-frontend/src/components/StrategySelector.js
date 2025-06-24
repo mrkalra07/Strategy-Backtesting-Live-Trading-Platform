@@ -1,113 +1,74 @@
+// src/components/StrategySelector.js
 import React, { useState } from 'react';
 import {
-  Button,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  TextField,
-  Grid
+  Accordion, AccordionSummary, AccordionDetails,
+  Typography, FormControl, InputLabel, Select,
+  MenuItem, Grid, TextField, Button
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
-const StrategySelector = ({ onRunBacktest }) => {
-  const [strategy, setStrategy] = useState('ema');
-  const [slippage, setSlippage] = useState(0.001);     // 0.1%
-  const [fees, setFees] = useState(0.001);             // 0.1%
-  const [stopLoss, setStopLoss] = useState(0.02);      // 2%
-  const [takeProfit, setTakeProfit] = useState(0.04);  // 4%
+export default function StrategySelector({ onRunBacktest, strategy, setStrategy }) {
+  const [slippage, setSlippage] = useState(0.001);
+  const [fees, setFees] = useState(0.001);
+  const [stopLoss, setStopLoss] = useState(0.02);
+  const [takeProfit, setTakeProfit] = useState(0.04);
 
   const handleRun = () => {
-    if (strategy === "custom") {
-      alert("⚠️ Custom strategy is currently disabled.");
-      return;
-    }
-
-    console.log("Running backtest with:", {
-      strategy,
-      slippage,
-      fees,
-      stopLoss,
-      takeProfit
-    });
-
     onRunBacktest({
       strategy,
       slippage,
       fees,
       stop_loss: stopLoss,
-      take_profit: takeProfit
+      take_profit: takeProfit,
     });
   };
 
   return (
-    <>
-      <FormControl fullWidth margin="normal">
-        <InputLabel>Strategy</InputLabel>
-        <Select
-          value={strategy}
-          label="Strategy"
-          onChange={(e) => setStrategy(e.target.value)}
-        >
-          <MenuItem value="ema">EMA</MenuItem>
-          <MenuItem value="rsi">RSI</MenuItem>
-          <MenuItem value="macd">MACD</MenuItem>
-          {/* Removed: <MenuItem value="custom">Custom</MenuItem> */}
-        </Select>
-      </FormControl>
-
-      <Grid container spacing={2}>
-        <Grid item xs={6} md={3}>
-          <TextField
-            label="Stop Loss (%)"
-            type="number"
-            inputProps={{ step: 0.01 }}
-            value={stopLoss}
-            onChange={(e) => setStopLoss(parseFloat(e.target.value))}
-            fullWidth
-          />
+    <Accordion sx={{ mb: 4 }}>
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+        <Typography>Configure Strategy</Typography>
+      </AccordionSummary>
+      <AccordionDetails>
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <InputLabel>Strategy</InputLabel>
+          <Select value={strategy} onChange={(e) => setStrategy(e.target.value)}>
+            <MenuItem value="ema">EMA</MenuItem>
+            <MenuItem value="rsi">RSI</MenuItem>
+            <MenuItem value="macd">MACD</MenuItem>
+            <MenuItem value="custom">Custom</MenuItem>
+          </Select>
+        </FormControl>
+        <Grid container spacing={2}>
+          {['Stop Loss', 'Take Profit', 'Fees', 'Slippage'].map((label, i) => (
+            <Grid item xs={6} sm={3} key={label}>
+              <TextField
+                label={label + ' (%)'}
+                type="number"
+                value={[stopLoss, takeProfit, fees, slippage][i]}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  i === 0 && setStopLoss(val);
+                  i === 1 && setTakeProfit(val);
+                  i === 2 && setFees(val);
+                  i === 3 && setSlippage(val);
+                }}
+                inputProps={{ step: 0.01 }}
+                fullWidth
+              />
+            </Grid>
+          ))}
         </Grid>
-        <Grid item xs={6} md={3}>
-          <TextField
-            label="Take Profit (%)"
-            type="number"
-            inputProps={{ step: 0.01 }}
-            value={takeProfit}
-            onChange={(e) => setTakeProfit(parseFloat(e.target.value))}
+        {strategy !== 'custom' && (
+          <Button
+            variant="contained"
             fullWidth
-          />
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <TextField
-            label="Fees (%)"
-            type="number"
-            inputProps={{ step: 0.0001 }}
-            value={fees}
-            onChange={(e) => setFees(parseFloat(e.target.value))}
-            fullWidth
-          />
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <TextField
-            label="Slippage (%)"
-            type="number"
-            inputProps={{ step: 0.0001 }}
-            value={slippage}
-            onChange={(e) => setSlippage(parseFloat(e.target.value))}
-            fullWidth
-          />
-        </Grid>
-      </Grid>
-
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={handleRun}
-        style={{ marginTop: 16 }}
-      >
-        Run Backtest
-      </Button>
-    </>
+            sx={{ mt: 2 }}
+            onClick={handleRun}
+          >
+            Run Backtest
+          </Button>
+        )}
+      </AccordionDetails>
+    </Accordion>
   );
-};
-
-export default StrategySelector;
+}

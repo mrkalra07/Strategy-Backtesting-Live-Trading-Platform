@@ -9,6 +9,7 @@
     "@mui/material": "^5.15.17",
     "ajv": "^6.12.6",
     "ajv-keywords": "^3.5.2",
+    "axios": "^1.10.0",
     "papaparse": "^5.5.3",
     "react": "^18.2.0",
     "react-dnd": "^16.0.1",

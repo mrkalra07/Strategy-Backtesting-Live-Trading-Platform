@@ -1,3 +1,4 @@
+// src/components/StrategyBuilder/Canvas.tsx
 import React, {
   useCallback,
   useState,
@@ -20,7 +21,7 @@ import 'reactflow/dist/style.css';
 import CustomNode from './CustomNode';
 
 const nodeTypes = {
-  custom: CustomNode,
+  custom: CustomNode
 };
 
 const Canvas = forwardRef((props, ref) => {
@@ -47,57 +48,54 @@ const Canvas = forwardRef((props, ref) => {
     event.preventDefault();
 
     const type = event.dataTransfer.getData('application/reactflow');
-    console.log("🔥 Dropped type:", type);
-
     if (!type) return;
 
     const position = { x: event.clientX - 250, y: event.clientY - 80 };
-    const id = `${type}_${Date.now()}`;
-
-    let newNode: Node;
+    const id = `node_${Date.now()}`;
 
     const baseData = {
-  id,
-  type,
-  setPeriod: (val: number) => {
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === id ? { ...n, data: { ...n.data, period: val, label: `${n.data.indicatorType}(${val})` } } : n
-      )
-    );
-  },
-  setValue: (val: number) => {
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === id ? { ...n, data: { ...n.data, value: val, label: `${val}` } } : n
-      )
-    );
-  },
-  setOperator: (op: string) => {
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === id ? { ...n, data: { ...n.data, operator: op, label: op } } : n
-      )
-    );
-  },
-  setIndicatorType: (type: string) => {
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === id
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                indicatorType: type,
-                label: `${type}(${n.data.period})`
-              }
-            }
-          : n
-      )
-    );
-  }
-};
+      id,
+      type,
+      setPeriod: (val: number) => {
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === id ? { ...n, data: { ...n.data, period: val, label: `${n.data.indicatorType}(${val})` } } : n
+          )
+        );
+      },
+      setValue: (val: number) => {
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === id ? { ...n, data: { ...n.data, value: val, label: `${val}` } } : n
+          )
+        );
+      },
+      setOperator: (op: string) => {
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === id ? { ...n, data: { ...n.data, operator: op, label: op } } : n
+          )
+        );
+      },
+      setIndicatorType: (type: string) => {
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === id
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    indicatorType: type,
+                    label: `${type}(${n.data.period})`
+                  }
+                }
+              : n
+          )
+        );
+      }
+    };
 
+    let newNode: Node;
 
     if (type === 'indicator') {
       newNode = {
