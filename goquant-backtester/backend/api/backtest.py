@@ -289,7 +289,7 @@ async def run_backtest(request: Request):
             "num_trades": len([t for t in trades if t["action"] == "sell"]),
             "avg_trade_profit": np.mean([t.get("profit", 0) for t in trades if "profit" in t]) if trades else 0,
             "average_holding_time": np.mean(holding_times) if holding_times else 0,
-            "win_rate": (len([t for t in trades if t.get("profit", 0) > 0]) / len([t for t in trades if t["action"] == "sell"])) * 100 if trades else 0,
+            "win_rate": ((len([t for t in trades if t.get("profit", 0) > 0]) / len([t for t in trades if t["action"] == "sell"])) * 100) if trades and len([t for t in trades if t["action"] == "sell"]) > 0 else 0,
             "max_drawdown": max_drawdown,
             "sharpe_ratio": sharpe_ratio,
             "sortino_ratio": sortino_ratio,
