@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { createTheme, ThemeProvider, CssBaseline, IconButton } from '@mui/material';
-import { Brightness4, Brightness7 } from '@mui/icons-material';
+import { createTheme, ThemeProvider, CssBaseline, Box } from '@mui/material';
 
 import Layout from './components/Layout';
 import UploadCSV from './components/UploadCSV';
@@ -9,6 +8,7 @@ import StrategySelector from './components/StrategySelector';
 import StrategyBuilder from './components/StrategyBuilder/StrategyBuilder';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import LiveTradingDashboard from './components/LiveTradingDashboard';
+import LiveBacktestPanel from './components/LiveBacktestPanel';
 
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -18,6 +18,9 @@ function App() {
   const [strategy, setStrategy] = useState('');
   const [backtestResult, setBacktestResult] = useState(null);
   const [mode, setMode] = useState('dark');
+  const [useWebSocket, setUseWebSocket] = useState(false);
+  const [wsPayload, setWsPayload] = useState(null);
+  const [showLivePanel, setShowLivePanel] = useState(false);
 
   const theme = useMemo(() =>
     createTheme({
@@ -52,19 +55,22 @@ function App() {
   const handleRunBacktest = async (config) => {
     const selectedStrategy = config.strategy;
     setStrategy(selectedStrategy);
-
     const payload = {
       ...config,
       data: uploadedData,
     };
-
+    if (useWebSocket) {
+      setWsPayload(payload);
+      setShowLivePanel(true);
+      setBacktestResult(null);
+      return;
+    }
     try {
       const res = await fetch('http://localhost:8000/backtest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
       if (res.ok) {
         const result = await res.json();
         setBacktestResult(result);
@@ -105,6 +111,17 @@ function App() {
                           />
                         )}
                       </>
+                    )}
+                    {showLivePanel && wsPayload && (
+                      <LiveBacktestPanel
+                        payload={wsPayload}
+                        enabled={showLivePanel}
+                        onComplete={(result) => {
+                          setBacktestResult(result);
+                          setShowLivePanel(false);
+                        }}
+                        onCancel={() => setShowLivePanel(false)}
+                      />
                     )}
                     {backtestResult && (
                       <AnalyticsDashboard result={backtestResult} strategy={strategy} />
