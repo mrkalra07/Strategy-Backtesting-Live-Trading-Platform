@@ -2,6 +2,8 @@ import pandas as pd
 import re
 from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
+from backend.strategy.indicators import compute_macd
+
 
 def evaluate_custom_logic(data: pd.DataFrame, logic: str) -> pd.DataFrame:
     df = data.copy()

@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { createTheme, ThemeProvider, CssBaseline, Box } from '@mui/material';
+import { createTheme, ThemeProvider, CssBaseline, Box, Button } from '@mui/material';
 
 import Layout from './components/Layout';
 import UploadCSV from './components/UploadCSV';
@@ -9,6 +8,7 @@ import StrategyBuilder from './components/StrategyBuilder/StrategyBuilder';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import LiveTradingDashboard from './components/LiveTradingDashboard';
 import LiveBacktestPanel from './components/LiveBacktestPanel';
+import VisualStrategyBuilder from './components/StrategyBuilder/VisualStrategyBuilder';
 
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -21,6 +21,8 @@ function App() {
   const [useWebSocket, setUseWebSocket] = useState(false);
   const [wsPayload, setWsPayload] = useState(null);
   const [showLivePanel, setShowLivePanel] = useState(false);
+  const [showStrategyBuilder, setShowStrategyBuilder] = useState(false);
+  const [showVisualBuilder, setShowVisualBuilder] = useState(false);
 
   const theme = useMemo(() =>
     createTheme({
@@ -36,11 +38,9 @@ function App() {
 
   // Helper: ensure uploadedData is always {symbol: [ohlcvRows, ...], ...}
   const handleUploadSuccess = (data) => {
-    // If data is already an object with symbol keys, use as is
     if (data && typeof data === 'object' && !Array.isArray(data)) {
       setUploadedData(data);
     } else if (Array.isArray(data)) {
-      // If single array, prompt for symbol (fallback: 'SYMBOL1')
       const symbol = window.prompt('Enter symbol for uploaded data:', 'SYMBOL1');
       if (symbol) {
         setUploadedData({ [symbol]: data });
@@ -85,55 +85,59 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
-        <DndProvider backend={HTML5Backend}>
-          <Layout
-            toggleTheme={toggleTheme}
-            isDarkMode={mode === 'dark'}
-          >
-            <Routes>
-              <Route
-                path="/"
-                element={
-                  <>
-                    <UploadCSV onUploadSuccess={handleUploadSuccess} />
-                    {uploadedData && (
-                      <>
-                        <StrategySelector
-                          onRunBacktest={handleRunBacktest}
-                          setStrategy={setStrategy}
-                          strategy={strategy}
-                        />
-                        {strategy === 'custom' && (
-                          <StrategyBuilder
-                            uploadedOHLCVData={uploadedData}
-                            onResult={(res) => setBacktestResult(res)}
-                          />
-                        )}
-                      </>
-                    )}
-                    {showLivePanel && wsPayload && (
-                      <LiveBacktestPanel
-                        payload={wsPayload}
-                        enabled={showLivePanel}
-                        onComplete={(result) => {
-                          setBacktestResult(result);
-                          setShowLivePanel(false);
-                        }}
-                        onCancel={() => setShowLivePanel(false)}
-                      />
-                    )}
-                    {backtestResult && (
-                      <AnalyticsDashboard result={backtestResult} strategy={strategy} />
-                    )}
-                  </>
-                }
-              />
-              <Route path="/live-trading" element={<LiveTradingDashboard />} />
-            </Routes>
-          </Layout>
-        </DndProvider>
-      </Router>
+      <DndProvider backend={HTML5Backend}>
+        <Layout
+          toggleTheme={toggleTheme}
+          isDarkMode={mode === 'dark'}
+        >
+          {showVisualBuilder ? (
+            <Box sx={{ my: 2 }}>
+              <Button variant="outlined" color="secondary" onClick={() => setShowVisualBuilder(false)}>
+                Back to Main
+              </Button>
+              <VisualStrategyBuilder />
+            </Box>
+          ) : (
+            <>
+              <UploadCSV onUploadSuccess={handleUploadSuccess} />
+              <Box sx={{ my: 2 }}>
+                <Button variant="contained" color="primary" onClick={() => setShowVisualBuilder(true)}>
+                  Open Visual Strategy Builder
+                </Button>
+              </Box>
+              {uploadedData && (
+                <>
+                  <StrategySelector
+                    onRunBacktest={handleRunBacktest}
+                    setStrategy={setStrategy}
+                    strategy={strategy}
+                  />
+                  {strategy === 'custom' && (
+                    <StrategyBuilder
+                      uploadedOHLCVData={uploadedData}
+                      onResult={(res) => setBacktestResult(res)}
+                    />
+                  )}
+                </>
+              )}
+              {showLivePanel && wsPayload && (
+                <LiveBacktestPanel
+                  payload={wsPayload}
+                  enabled={showLivePanel}
+                  onComplete={(result) => {
+                    setBacktestResult(result);
+                    setShowLivePanel(false);
+                  }}
+                  onCancel={() => setShowLivePanel(false)}
+                />
+              )}
+              {backtestResult && (
+                <AnalyticsDashboard result={backtestResult} strategy={strategy} />
+              )}
+            </>
+          )}
+        </Layout>
+      </DndProvider>
     </ThemeProvider>
   );
 }

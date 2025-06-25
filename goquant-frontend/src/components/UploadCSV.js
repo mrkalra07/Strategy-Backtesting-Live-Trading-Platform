@@ -129,11 +129,8 @@ export default function UploadCSV({ onUploadSuccess, onMetaChange }) {
             {files.map((file) => {
               const symbol = file.name.replace(/\.csv$/i, '');
               return (
-                <Box key={symbol} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                  <Typography sx={{ minWidth: 100 }}>{symbol}</Typography>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', minWidth: 90 }}>
-                    Exchange: {meta[symbol]?.exchange || EXCHANGES[0]}
-                  </Typography>
+                <Box key={symbol} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1, flexWrap: 'wrap' }}>
+                  <Typography sx={{ minWidth: 120, fontWeight: 500 }}>{symbol}</Typography>
                   <FormControl size="small" sx={{ minWidth: 120 }}>
                     <InputLabel>Exchange</InputLabel>
                     <Select
@@ -144,9 +141,6 @@ export default function UploadCSV({ onUploadSuccess, onMetaChange }) {
                       {EXCHANGES.map(ex => <MenuItem key={ex} value={ex}>{ex}</MenuItem>)}
                     </Select>
                   </FormControl>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', minWidth: 90 }}>
-                    Market: {meta[symbol]?.market_type || MARKET_TYPES[0]}
-                  </Typography>
                   <FormControl size="small" sx={{ minWidth: 120 }}>
                     <InputLabel>Market Type</InputLabel>
                     <Select

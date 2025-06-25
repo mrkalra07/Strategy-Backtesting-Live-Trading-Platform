@@ -1,0 +1,295 @@
+// src/components/StrategyBuilder/VisualStrategyBuilder.tsx
+import React, { useState, useCallback } from 'react';
+import ReactFlow, {
+  Background,
+  Controls,
+  addEdge,
+  applyNodeChanges,
+  applyEdgeChanges,
+  Connection,
+  Edge,
+  Node,
+  OnNodesChange,
+  OnEdgesChange
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import { Box, Typography, Button } from '@mui/material';
+// @ts-ignore
+import UploadCSV from '../UploadCSV';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+
+// Optionally import types for UploadCSV if needed
+// import type { SymbolData } from '../uploadcsv';
+
+const initialNodes: Node[] = [];
+const initialEdges: Edge[] = [];
+
+const nodeTypes = {};
+
+const VisualStrategyBuilder: React.FC = () => {
+  const [nodes, setNodes] = useState<Node[]>(initialNodes);
+  const [edges, setEdges] = useState<Edge[]>(initialEdges);
+  const [dataUploaded, setDataUploaded] = useState(false);
+  const [uploadedData, setUploadedData] = useState<any>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [backtestResult, setBacktestResult] = useState<any>(null);
+
+  const selectedNode = nodes.find(n => n.id === selectedNodeId);
+
+  const onNodesChange: OnNodesChange = useCallback(
+    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
+    []
+  );
+
+  const onEdgesChange: OnEdgesChange = useCallback(
+    (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
+    []
+  );
+
+  const onConnect = useCallback(
+    (connection: Edge | Connection) => setEdges((eds) => addEdge(connection, eds)),
+    []
+  );
+
+  // Fix: add types for event and node
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    setSelectedNodeId(node.id);
+  }, []);
+
+  // Simple node adders for demo
+  const addNode = (type: string, label: string) => {
+    const id = `node_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    setNodes((nds) => nds.concat({
+      id,
+      type: 'default',
+      position: { x: 250, y: 100 + nds.length * 60 },
+      data: { label, nodeType: type },
+    }));
+  };
+
+  const handleNodeDataChange = (field: string, value: any) => {
+    setNodes(nds => nds.map(n => n.id === selectedNodeId ? {
+      ...n,
+      data: { ...n.data, [field]: value }
+    } : n));
+  };
+
+  if (!dataUploaded) {
+    return (
+      <Box sx={{ maxWidth: 600, mx: 'auto', mt: 6 }}>
+        <Typography variant="h5" gutterBottom>Upload Data to Start Building Your Strategy</Typography>
+        <UploadCSV onUploadSuccess={(data: any) => { setUploadedData(data); setDataUploaded(true); }} />
+      </Box>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', height: '70vh', background: 'transparent', borderRadius: 12 }}>
+      {/* Sidebar controls */}
+      <div style={{ width: 240, background: '#23272e', color: '#fff', padding: 18, borderRadius: 12, marginRight: 12 }}>
+        <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 18 }}>Strategy Builder</div>
+        <button onClick={() => addNode('asset', 'Asset/Market Selector')} style={{ marginBottom: 8, width: '100%' }}>+ Asset/Market</button>
+        <button onClick={() => addNode('indicator', 'Indicator')} style={{ marginBottom: 8, width: '100%' }}>+ Indicator</button>
+        <button onClick={() => addNode('logic', 'Logic Operator')} style={{ marginBottom: 8, width: '100%' }}>+ Logic</button>
+        <button onClick={() => addNode('execution', 'Execution')} style={{ marginBottom: 8, width: '100%' }}>+ Execution</button>
+        <button onClick={() => addNode('risk', 'Risk Management')} style={{ marginBottom: 8, width: '100%' }}>+ Risk</button>
+      </div>
+      {/* Canvas */}
+      <div style={{ flex: 1, background: '#181a20', borderRadius: 12, padding: 0, position: 'relative', display: 'flex' }}>
+        <div style={{ flex: 1 }}>
+          <ReactFlow
+            nodeTypes={nodeTypes}
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            fitView
+          >
+            <Background color="#23272e" gap={18} />
+            <Controls />
+          </ReactFlow>
+        </div>
+        {/* Node property sidebar */}
+        {selectedNode && (
+          <Box sx={{ width: 300, background: '#23272e', color: '#fff', p: 3, borderRadius: 2, ml: 2, minHeight: '100%' }}>
+            <Typography variant="h6" gutterBottom>Node Properties</Typography>
+            <Typography variant="subtitle2" gutterBottom>Type: {selectedNode.data.nodeType}</Typography>
+            <Typography variant="subtitle2" gutterBottom>Label: {selectedNode.data.label}</Typography>
+            {/* Dynamic fields based on node type */}
+            {selectedNode.data.nodeType === 'indicator' && (
+              <>
+                <label style={{ display: 'block', marginTop: 12 }}>Indicator</label>
+                <select
+                  value={selectedNode.data.indicatorType || 'rsi'}
+                  onChange={e => handleNodeDataChange('indicatorType', e.target.value)}
+                  style={{ width: '100%', padding: 6, borderRadius: 4, marginBottom: 12 }}
+                >
+                  <option value="rsi">RSI</option>
+                  <option value="ema">EMA</option>
+                  <option value="macd">MACD</option>
+                </select>
+                <label>Period</label>
+                <input
+                  type="number"
+                  value={selectedNode.data.period || 14}
+                  onChange={e => handleNodeDataChange('period', Number(e.target.value))}
+                  style={{ width: '100%', padding: 6, borderRadius: 4, marginBottom: 12 }}
+                />
+              </>
+            )}
+            {selectedNode.data.nodeType === 'logic' && (
+              <>
+                <label style={{ display: 'block', marginTop: 12 }}>Logic Operator</label>
+                <select
+                  value={selectedNode.data.logicType || 'and'}
+                  onChange={e => handleNodeDataChange('logicType', e.target.value)}
+                  style={{ width: '100%', padding: 6, borderRadius: 4, marginBottom: 12 }}
+                >
+                  <option value="and">AND</option>
+                  <option value="or">OR</option>
+                  <option value="not">NOT</option>
+                  <option value="xor">XOR</option>
+                  <option value="nand">NAND</option>
+                  <option value="nor">NOR</option>
+                  <option value="xnor">XNOR</option>
+                  <option value="if">IF</option>
+                  <option value="else">ELSE</option>
+                  <option value="gt">&gt; (Greater Than)</option>
+                  <option value="lt">&lt; (Less Than)</option>
+                  <option value="eq">== (Equal)</option>
+                  <option value="neq">!= (Not Equal)</option>
+                </select>
+              </>
+            )}
+            {selectedNode.data.nodeType === 'asset' && (
+              <>
+                <label style={{ display: 'block', marginTop: 12 }}>Symbol</label>
+                <input
+                  type="text"
+                  value={selectedNode.data.symbol || ''}
+                  onChange={e => handleNodeDataChange('symbol', e.target.value)}
+                  style={{ width: '100%', padding: 6, borderRadius: 4, marginBottom: 12 }}
+                />
+              </>
+            )}
+            {selectedNode.data.nodeType === 'execution' && (
+              <>
+                <label style={{ display: 'block', marginTop: 12 }}>Order Type</label>
+                <select
+                  value={selectedNode.data.orderType || 'market'}
+                  onChange={e => handleNodeDataChange('orderType', e.target.value)}
+                  style={{ width: '100%', padding: 6, borderRadius: 4, marginBottom: 12 }}
+                >
+                  <option value="market">Market</option>
+                  <option value="limit">Limit</option>
+                </select>
+              </>
+            )}
+            {selectedNode.data.nodeType === 'risk' && (
+              <>
+                <label style={{ display: 'block', marginTop: 12 }}>Max Drawdown (%)</label>
+                <input
+                  type="number"
+                  value={selectedNode.data.maxDrawdown || 10}
+                  onChange={e => handleNodeDataChange('maxDrawdown', Number(e.target.value))}
+                  style={{ width: '100%', padding: 6, borderRadius: 4, marginBottom: 12 }}
+                />
+              </>
+            )}
+            <Button variant="contained" color="secondary" sx={{ mt: 2 }} onClick={() => setSelectedNodeId(null)}>
+              Close
+            </Button>
+          </Box>
+        )}
+      </div>
+      {/* Export/Run Strategy button */}
+      <div style={{ position: 'absolute', bottom: 24, right: 24, zIndex: 10 }}>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={async () => {
+            try {
+              const res = await fetch('http://localhost:8000/strategy/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nodes, edges, data: uploadedData }),
+              });
+              if (res.ok) {
+                const result = await res.json();
+                setBacktestResult(result);
+              } else {
+                alert('Backend error: ' + res.status);
+              }
+            } catch (err) {
+              alert('Network error: ' + err);
+            }
+          }}
+        >
+          Export / Run Strategy
+        </Button>
+      </div>
+      {/* Styled summary for backtest result */}
+      {backtestResult && (
+        <Box sx={{ mt: 4, p: 3, background: '#222', color: '#fff', borderRadius: 2, maxWidth: 900, mx: 'auto' }}>
+          <Typography variant="h6" gutterBottom>Backtest Result</Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mb: 2 }}>
+            <Box>
+              <Typography variant="body2"><b>Status:</b> {backtestResult.status || 'N/A'}</Typography>
+              <Typography variant="body2"><b>Symbol:</b> {backtestResult.symbol || 'N/A'}</Typography>
+              <Typography variant="body2"><b>Node Count:</b> {backtestResult.node_count || 0} &nbsp; <b>Edge Count:</b> {backtestResult.edge_count || 0}</Typography>
+            </Box>
+            {backtestResult.total_profit !== undefined && (
+              <Box>
+                <Typography variant="body2"><b>Total Profit:</b> {backtestResult.total_profit.toFixed(2)}</Typography>
+                <Typography variant="body2"><b>Num Trades:</b> {backtestResult.num_trades}</Typography>
+                <Typography variant="body2"><b>Win Rate:</b> {backtestResult.win_rate ? backtestResult.win_rate.toFixed(1) + '%' : 'N/A'}</Typography>
+                <Typography variant="body2"><b>Max Drawdown:</b> {backtestResult.max_drawdown !== undefined ? backtestResult.max_drawdown.toFixed(2) : 'N/A'}</Typography>
+                <Typography variant="body2"><b>Sharpe Ratio:</b> {backtestResult.sharpe_ratio !== undefined ? backtestResult.sharpe_ratio.toFixed(2) : 'N/A'}</Typography>
+                <Typography variant="body2"><b>Sortino Ratio:</b> {backtestResult.sortino_ratio !== undefined ? backtestResult.sortino_ratio.toFixed(2) : 'N/A'}</Typography>
+                <Typography variant="body2"><b>Profit Factor:</b> {backtestResult.profit_factor !== undefined ? backtestResult.profit_factor.toFixed(2) : 'N/A'}</Typography>
+                <Typography variant="body2"><b>Annualized Return:</b> {backtestResult.annualized_return !== undefined ? (backtestResult.annualized_return * 100).toFixed(2) + '%' : 'N/A'}</Typography>
+                <Typography variant="body2"><b>Annualized Volatility:</b> {backtestResult.annualized_volatility !== undefined ? (backtestResult.annualized_volatility * 100).toFixed(2) + '%' : 'N/A'}</Typography>
+              </Box>
+            )}
+          </Box>
+          {/* Equity Curve Chart */}
+          {backtestResult.equity_curve && Array.isArray(backtestResult.equity_curve) && backtestResult.equity_curve.length > 0 && (
+            <Box sx={{ mt: 3, mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Equity Curve</Typography>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={backtestResult.equity_curve} margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                  <XAxis dataKey="date" tick={{ fill: '#fff', fontSize: 12 }} hide={backtestResult.equity_curve.length > 30} />
+                  <YAxis tick={{ fill: '#fff', fontSize: 12 }} width={70} />
+                  <Tooltip contentStyle={{ background: '#222', color: '#fff', border: 'none' }} />
+                  <Legend />
+                  <Line type="monotone" dataKey="equity" stroke="#00e676" dot={false} strokeWidth={2} name="Equity" />
+                </LineChart>
+              </ResponsiveContainer>
+            </Box>
+          )}
+          {/* Drawdown Curve Chart */}
+          {backtestResult.drawdown_curve && Array.isArray(backtestResult.drawdown_curve) && backtestResult.drawdown_curve.length > 0 && (
+            <Box sx={{ mt: 3, mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Drawdown Curve</Typography>
+              <ResponsiveContainer width="100%" height={120}>
+                <LineChart data={backtestResult.drawdown_curve} margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                  <XAxis dataKey="date" tick={{ fill: '#fff', fontSize: 12 }} hide={backtestResult.drawdown_curve.length > 30} />
+                  <YAxis tick={{ fill: '#fff', fontSize: 12 }} width={70} />
+                  <Tooltip contentStyle={{ background: '#222', color: '#fff', border: 'none' }} />
+                  <Legend />
+                  <Line type="monotone" dataKey="drawdown" stroke="#ff1744" dot={false} strokeWidth={2} name="Drawdown" />
+                </LineChart>
+              </ResponsiveContainer>
+            </Box>
+          )}
+        </Box>
+      )}
+    </div>
+  );
+};
+
+export default VisualStrategyBuilder;

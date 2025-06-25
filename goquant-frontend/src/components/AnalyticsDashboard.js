@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Typography,
   Divider,
@@ -7,6 +7,9 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Tabs,
+  Tab,
+  Card,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -18,8 +21,11 @@ import BacktestTable from './BacktestTable';
 import DrawdownChart from './DrawdownChart';
 import TradeReturnsChart from './TradeReturnsChart';
 import PnLChart from './PnLChart';
+import RollingSharpeChart from './RollingSharpeChart';
+import RiskHeatmap from './RiskHeatmap';
 
 const AnalyticsDashboard = ({ result, strategy }) => {
+  const [view, setView] = useState('portfolio');
   const navigate = useNavigate();
   if (!result || !result.portfolio) return null;
   const portfolio = result.portfolio;
@@ -45,12 +51,29 @@ const AnalyticsDashboard = ({ result, strategy }) => {
     link.click();
   };
 
+  const handleTabChange = (e, newValue) => setView(newValue);
+
+  const currentData =
+    view === 'portfolio' ? result.portfolio : result.per_symbol[view] || {};
+
   return (
     <div style={{ marginTop: 32 }}>
       <Typography variant="h4" gutterBottom align="center" color="primary">
         📊 Analytics Dashboard (Portfolio)
       </Typography>
       <Divider style={{ margin: '24px 0' }} />
+      <Tabs
+        value={view}
+        onChange={handleTabChange}
+        sx={{ mb: 2 }}
+        variant="scrollable"
+        scrollButtons="auto"
+      >
+        <Tab label="Portfolio" value="portfolio" />
+        {Object.keys(result.per_symbol || {}).map((s) => (
+          <Tab key={s} label={s} value={s} />
+        ))}
+      </Tabs>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h6">📌 Strategy Chart</Typography>
         <BacktestChart data={portfolioChartData} strategy={strategy} trades={portfolio.trades} />
@@ -92,7 +115,14 @@ const AnalyticsDashboard = ({ result, strategy }) => {
         <Typography variant="h6">📈 Profit & Loss Over Time</Typography>
         <PnLChart trades={portfolio.trades} />
       </Box>
-
+      <Card sx={{ mt: 3, p: 2 }}>
+        <Typography variant="h6">Rolling Sharpe Ratio</Typography>
+        <RollingSharpeChart data={currentData.rolling_sharpe || []} />
+      </Card>
+      <Card sx={{ mt: 3, p: 2 }}>
+        <Typography variant="h6">Risk Heatmap</Typography>
+        <RiskHeatmap perSymbol={result.per_symbol || {}} />
+      </Card>
       {/* Per-symbol breakdown */}
       {result.per_symbol && (
         <>

@@ -1,11 +1,12 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
+from typing import Any, Dict
+import numpy as np
+import pandas as pd
 from backend.strategy.ema_strategy import generate_ema_signals
 from backend.strategy.rsi_strategy import generate_rsi_signals
 from backend.strategy.macd_strategy import generate_macd_signals
 from backend.strategy.custom_logic import evaluate_custom_logic
-import numpy as np
-import pandas as pd
 
 router = APIRouter()
 
@@ -17,6 +18,19 @@ def clean_json(obj):
     elif isinstance(obj, float) and (np.isnan(obj) or np.isinf(obj)):
         return None
     return obj
+
+def parse_graph(nodes, edges):
+    # Build a mapping from node id to node data
+    node_map = {n['id']: n for n in nodes}
+    # Build adjacency (children) and reverse adjacency (parents)
+    children = {n['id']: [] for n in nodes}
+    parents = {n['id']: [] for n in nodes}
+    for e in edges:
+        source = e['source']
+        target = e['target']
+        children[source].append(target)
+        parents[target].append(source)
+    return node_map, children, parents
 
 @router.post("/backtest")
 async def run_backtest(request: Request):
@@ -405,3 +419,66 @@ async def run_backtest(request: Request):
         result["portfolio"] = per_symbol_results[only_symbol].copy()
 
     return JSONResponse(content=clean_json(result))
+
+@router.post('/strategy/run')
+async def run_strategy(request: Request):
+    payload = await request.json()
+    nodes = payload.get('nodes', [])
+    edges = payload.get('edges', [])
+    data = payload.get('data', {})
+
+    node_map, children, parents = parse_graph(nodes, edges)
+
+    # Find asset node (start node)
+    asset_nodes = [n for n in nodes if n['data'].get('nodeType') == 'asset']
+    if not asset_nodes:
+        raise HTTPException(status_code=400, detail='No asset node found.')
+    asset_node = asset_nodes[0]
+    symbol = asset_node['data'].get('symbol') or list(data.keys())[0]
+    ohlcv = data[symbol]['ohlcv'] if symbol in data else []
+    df = pd.DataFrame(ohlcv)
+
+    # Traverse and apply indicators
+    indicator_nodes = [n for n in nodes if n['data'].get('nodeType') == 'indicator']
+    for ind_node in indicator_nodes:
+        ind_type = ind_node['data'].get('indicatorType')
+        if ind_type == 'rsi':
+            period = ind_node['data'].get('period', 14)
+            df['rsi'] = pd.Series([row['rsi'] for row in generate_rsi_signals(ohlcv, period=period)])
+        elif ind_type == 'ema':
+            period = ind_node['data'].get('period', 14)
+            df['ema'] = pd.Series([row['ema_short'] for row in generate_ema_signals(ohlcv, short_span=period, long_span=period+10)])
+        elif ind_type == 'macd':
+            df['macd'] = pd.Series([row['macd'] for row in generate_macd_signals(ohlcv)])
+
+    # Traverse and apply logic nodes (for demo, just use the first logic node)
+    logic_nodes = [n for n in nodes if n['data'].get('nodeType') == 'logic']
+    if logic_nodes:
+        logic_type = logic_nodes[0]['data'].get('logicType', 'and')
+        # For demo: if indicator > threshold, signal = 1 else 0
+        if 'rsi' in df.columns:
+            if logic_type == 'gt':
+                df['signal'] = (df['rsi'] > 50).astype(int)
+            elif logic_type == 'lt':
+                df['signal'] = (df['rsi'] < 50).astype(int)
+            else:
+                df['signal'] = (df['rsi'] > 50).astype(int)
+        elif 'ema' in df.columns:
+            df['signal'] = (df['ema'] > df['ema'].rolling(5).mean()).astype(int)
+        elif 'macd' in df.columns:
+            df['signal'] = (df['macd'] > 0).astype(int)
+        else:
+            df['signal'] = 0
+    else:
+        # Fallback: no logic node, no signals
+        df['signal'] = 0
+
+    # For demo: return the first 5 rows
+    return JSONResponse({
+        'status': 'parsed',
+        'symbol': symbol,
+        'head': df.head(5).to_dict(orient='records'),
+        'columns': list(df.columns),
+        'node_count': len(nodes),
+        'edge_count': len(edges)
+    })
