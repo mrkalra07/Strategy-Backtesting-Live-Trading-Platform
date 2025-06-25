@@ -31,8 +31,22 @@ function App() {
 
   const toggleTheme = () => setMode(prev => (prev === 'light' ? 'dark' : 'light'));
 
+  // Helper: ensure uploadedData is always {symbol: [ohlcvRows, ...], ...}
   const handleUploadSuccess = (data) => {
-    setUploadedData(data);
+    // If data is already an object with symbol keys, use as is
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      setUploadedData(data);
+    } else if (Array.isArray(data)) {
+      // If single array, prompt for symbol (fallback: 'SYMBOL1')
+      const symbol = window.prompt('Enter symbol for uploaded data:', 'SYMBOL1');
+      if (symbol) {
+        setUploadedData({ [symbol]: data });
+      } else {
+        setUploadedData({ 'SYMBOL1': data });
+      }
+    } else {
+      setUploadedData(null);
+    }
   };
 
   const handleRunBacktest = async (config) => {
