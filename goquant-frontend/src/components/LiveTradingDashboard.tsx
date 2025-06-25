@@ -1,4 +1,3 @@
-// src/components/LiveTradingDashboard.tsx
 import React, { useState } from 'react';
 import {
   Typography,
@@ -10,10 +9,15 @@ import {
   ListItem,
   ListItemText,
   Chip,
-  Divider
+  Divider,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import LiveCandle from './LiveCandle';
 import LiveCandleChart from './LiveCandleChart';
+import OpenPositions from './OpenPositions';
 
 type LiveTrade = {
   id: string;
@@ -27,16 +31,19 @@ type LiveTrade = {
   timestamp: string;
   status: string;
 };
+const AVAILABLE_SYMBOLS = ["BTC-USDT", "ETH-USDT", "AAPL"];
+
 
 const LiveTradingDashboard: React.FC = () => {
   const [liveTrades, setLiveTrades] = useState<LiveTrade[]>([]);
+  const [selectedSymbol, setSelectedSymbol] = useState("BTC-USDT");
 
   const sendTrade = async (side: 'buy' | 'sell') => {
     const socket = new WebSocket("ws://localhost:8000/ws/live-trading");
 
     socket.onopen = () => {
       const order = {
-        symbol: "BTC-USDT",
+        symbol: selectedSymbol, // 💥 dynamic now
         side,
         type: "market",
         quantity: 1,
@@ -48,7 +55,7 @@ const LiveTradingDashboard: React.FC = () => {
 
     socket.onmessage = (event) => {
       const response = JSON.parse(event.data);
-      alert(`✅ ${side.toUpperCase()} executed at $${response.trade.price_executed}`);
+      alert(`✅ ${side.toUpperCase()} ${selectedSymbol} executed at $${response.trade.price_executed}`);
       setLiveTrades(prev => [response.trade, ...prev.slice(0, 9)]);
       socket.close();
     };
@@ -59,11 +66,26 @@ const LiveTradingDashboard: React.FC = () => {
       <Typography variant="h4" gutterBottom>📡 Live Trading Dashboard</Typography>
       <Divider style={{ margin: '20px 0' }} />
 
+      <FormControl fullWidth sx={{ mb: 3 }}>
+        <InputLabel>Symbol</InputLabel>
+        <Select
+          value={selectedSymbol}
+          label="Symbol"
+          onChange={(e) => setSelectedSymbol(e.target.value)}
+        >
+          {AVAILABLE_SYMBOLS.map((symbol) => (
+            <MenuItem key={symbol} value={symbol}>
+              {symbol}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
       <Paper elevation={3} style={{ padding: 16, marginBottom: 24 }}>
         <Typography variant="h6" gutterBottom>Live Price & Controls</Typography>
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
-            <LiveCandle symbol="BTC-USDT" />
+            <LiveCandle symbol={selectedSymbol} />
           </Grid>
           <Grid item xs={12} md={6}>
             <Box display="flex" gap={2}>
@@ -80,32 +102,35 @@ const LiveTradingDashboard: React.FC = () => {
 
       <Paper elevation={3} style={{ padding: 16, marginBottom: 24 }}>
         <Typography variant="h6" gutterBottom>Live OHLCV Candle Chart</Typography>
-        <LiveCandleChart />
+        <LiveCandleChart symbol={selectedSymbol} />
       </Paper>
 
       <Paper elevation={3} style={{ padding: 16 }}>
         <Typography variant="h6" gutterBottom>Recent Executed Trades</Typography>
         <List dense sx={{ maxHeight: 250, overflow: 'auto' }}>
-          {liveTrades.map((trade) => (
-            <ListItem key={trade.id}>
-              <ListItemText
-                primary={
-                  <>
-                    <Chip
-                      label={trade.side.toUpperCase()}
-                      color={trade.side === 'buy' ? 'success' : 'error'}
-                      size="small"
-                      sx={{ marginRight: 1 }}
-                    />
-                    ${trade.price_executed} | Qty: {trade.quantity}
-                  </>
-                }
-                secondary={new Date(trade.timestamp).toLocaleTimeString()}
-              />
-            </ListItem>
-          ))}
+          {liveTrades
+            .filter((trade) => trade.symbol === selectedSymbol)
+            .map((trade) => (
+              <ListItem key={trade.id}>
+                <ListItemText
+                  primary={
+                    <>
+                      <Chip
+                        label={trade.side.toUpperCase()}
+                        color={trade.side === 'buy' ? 'success' : 'error'}
+                        size="small"
+                        sx={{ marginRight: 1 }}
+                      />
+                      ${trade.price_executed} | Qty: {trade.quantity}
+                    </>
+                  }
+                  secondary={new Date(trade.timestamp).toLocaleTimeString()}
+                />
+              </ListItem>
+            ))}
         </List>
       </Paper>
+      <OpenPositions />
     </div>
   );
 };

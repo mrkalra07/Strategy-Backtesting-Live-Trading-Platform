@@ -10,9 +10,10 @@ from backend.api.ohlcv import router as ohlcv_router
 from backend.api.backtest import router as backtest_router
 from backend.api.websocket import router as websocket_router
 from api import live_trading
-from api import live_ohlcv
+#from backend.api.live_feed import router as live_feed_router
 
 app = FastAPI()
+#app.include_router(live_feed_router)
 
 # CORS configuration
 app.add_middleware(
@@ -28,7 +29,6 @@ app.include_router(ohlcv_router)
 app.include_router(backtest_router)
 app.include_router(websocket_router)
 app.include_router(live_trading.router)
-app.include_router(live_ohlcv.router)
 
 @app.get("/")
 def root():

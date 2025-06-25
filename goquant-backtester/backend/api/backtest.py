@@ -24,7 +24,6 @@ async def run_backtest(request: Request):
     strategy = payload.get("strategy")
     data = payload.get("data")
     custom_logic = payload.get("logic")
-
     sl = payload.get("sl")
     tp = payload.get("tp")
     fees = payload.get("fees", 0.0)
@@ -57,6 +56,7 @@ async def run_backtest(request: Request):
     entry_index = 0
     current_equity = 0
     chart_data = []
+    holding_times = []
 
     for idx, row in enumerate(signals):
         indicator_value = row.get("rsi") or row.get("ema_short") or row.get("macd")
@@ -81,7 +81,6 @@ async def run_backtest(request: Request):
         elif position == "long":
             exit_raw_price = row["close"]
             exit_price = exit_raw_price * (1 - slippage)
-
             hit_sl = sl and exit_price <= entry_price * (1 - sl)
             hit_tp = tp and exit_price >= entry_price * (1 + tp)
             is_exit_signal = row["signal"] == -1
@@ -90,6 +89,7 @@ async def run_backtest(request: Request):
             if should_exit:
                 position = None
                 holding_time = idx - entry_index
+                holding_times.append(holding_time)
                 gross_profit = exit_price - entry_price
                 fee_cost = (entry_price + exit_price) * fees
                 net_profit = gross_profit - fee_cost
@@ -114,17 +114,13 @@ async def run_backtest(request: Request):
                     "fee": fee_cost
                 })
 
-    # Prepare OHLCV DataFrame for metrics
+    # Prepare OHLCV DataFrame
     df = pd.DataFrame(data)
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df.set_index("timestamp", inplace=True)
 
-    # Calculate returns for VaR, Beta, etc
     asset_returns = df["close"].pct_change().dropna()
-
-    # MOCK benchmark returns: Replace this with real benchmark OHLCV and returns
     benchmark_returns = asset_returns.copy()
-
     var_95 = np.percentile(asset_returns, 5)
 
     if len(asset_returns) > 1 and len(benchmark_returns) > 1:
@@ -134,7 +130,7 @@ async def run_backtest(request: Request):
     else:
         beta = np.nan
 
-    # Max drawdown
+    # Max Drawdown
     max_drawdown = 0
     if equity_curve:
         peak = equity_curve[0]
@@ -144,7 +140,7 @@ async def run_backtest(request: Request):
             drawdown = peak - val
             max_drawdown = max(max_drawdown, drawdown)
 
-    # Sharpe, Sortino, Profit factor
+    # Sharpe, Sortino, Profit Factor
     returns_array = np.array(returns)
     if len(returns_array) > 1:
         sharpe_ratio = np.mean(returns_array) / np.std(returns_array)
@@ -154,7 +150,10 @@ async def run_backtest(request: Request):
     else:
         sharpe_ratio = sortino_ratio = profit_factor = np.nan
 
-    # Max consecutive wins/losses
+    # Calmar Ratio (final)
+    calmar_ratio = (equity_curve[-1] / max_drawdown) if max_drawdown else None
+
+    # Max Consecutive Wins/Losses
     max_consecutive_wins = max_consecutive_losses = 0
     current_win = current_loss = 0
     for t in trades:
@@ -168,7 +167,7 @@ async def run_backtest(request: Request):
             max_consecutive_wins = max(max_consecutive_wins, current_win)
             max_consecutive_losses = max(max_consecutive_losses, current_loss)
 
-    # Equity and drawdown points
+    # Equity and Drawdown Curves
     equity_data = []
     drawdown_curve = []
     cumulative_equity = 0
@@ -191,7 +190,6 @@ async def run_backtest(request: Request):
     rolling_calmar = []
     window = 20
     equity_vals = [point['equity'] for point in equity_data]
-
     for i in range(window, len(equity_vals)):
         window_slice = equity_vals[i - window:i]
         ret = window_slice[-1] - window_slice[0]
@@ -202,19 +200,12 @@ async def run_backtest(request: Request):
             "calmar": calmar_val
         })
 
-    # ✅ Turnover and Leverage
+    # Turnover & Leverage
     entry_prices_sum = sum(t["entry_price"] for t in trades if t["action"] == "buy")
     num_entries = len([t for t in trades if t["action"] == "buy"])
     avg_capital_deployed = entry_prices_sum / num_entries if num_entries else 1
-
     turnover = entry_prices_sum / avg_capital_deployed if avg_capital_deployed else 0
-
-    gross_exposure = sum(
-        t["entry_price"] for t in trades if t["action"] == "buy"
-    ) + sum(
-        t.get("exit_price", 0) for t in trades if t["action"] == "sell"
-    )
-
+    gross_exposure = entry_prices_sum + sum(t.get("exit_price", 0) for t in trades if t["action"] == "sell")
     net_equity = sum(t.get("profit", 0) for t in trades if "profit" in t)
     leverage = gross_exposure / net_equity if net_equity != 0 else 0
 
@@ -226,11 +217,13 @@ async def run_backtest(request: Request):
         "total_profit": net_equity,
         "num_trades": len([t for t in trades if t["action"] == "sell"]),
         "avg_trade_profit": np.mean([t.get("profit", 0) for t in trades if "profit" in t]) if trades else 0,
+        "average_holding_time": np.mean(holding_times) if holding_times else 0,
         "win_rate": (len([t for t in trades if t.get("profit", 0) > 0]) / len([t for t in trades if t["action"] == "sell"])) * 100 if trades else 0,
         "max_drawdown": max_drawdown,
         "sharpe_ratio": sharpe_ratio,
         "sortino_ratio": sortino_ratio,
         "profit_factor": profit_factor,
+        "calmar_ratio": calmar_ratio,
         "max_consecutive_wins": max_consecutive_wins,
         "max_consecutive_losses": max_consecutive_losses,
         "var_95": var_95,
