@@ -17,21 +17,27 @@ type Position = {
   quantity: number;
   price_executed: number;
   current_price: number;
-  unrealized_pnl: number;
+  pnl: number;
 };
 
 const OpenPositions: React.FC = () => {
   const [positions, setPositions] = useState<Position[]>([]);
 
   useEffect(() => {
-    const socket = new WebSocket('ws://localhost:8000/ws/positions');
-
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      setPositions(data);
+    const fetchPositions = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/live/open-positions');
+        const data = await res.json();
+        setPositions(data);
+      } catch (err) {
+        console.error("Failed to fetch open positions:", err);
+      }
     };
 
-    return () => socket.close();
+    fetchPositions(); // initial call
+    const interval = setInterval(fetchPositions, 1000); // refresh every 1s
+
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -63,9 +69,9 @@ const OpenPositions: React.FC = () => {
               <TableCell>${pos.price_executed.toFixed(2)}</TableCell>
               <TableCell>${pos.current_price.toFixed(2)}</TableCell>
               <TableCell
-                style={{ color: pos.unrealized_pnl >= 0 ? 'green' : 'red' }}
+                style={{ color: pos.pnl >= 0 ? 'green' : 'red' }}
               >
-                ${pos.unrealized_pnl.toFixed(2)}
+                ${pos.pnl.toFixed(2)}
               </TableCell>
             </TableRow>
           ))}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Typography,
   Paper,
@@ -18,6 +18,7 @@ import {
 import LiveCandle from './LiveCandle';
 import LiveCandleChart from './LiveCandleChart';
 import OpenPositions from './OpenPositions';
+import ClosedTrades from './ClosedTrades';
 
 type LiveTrade = {
   id: string;
@@ -30,25 +31,64 @@ type LiveTrade = {
   price_executed: number;
   timestamp: string;
   status: string;
+  close_price?: number;
+  close_time?: string;
 };
-const AVAILABLE_SYMBOLS = ["BTC-USDT", "ETH-USDT", "AAPL"];
 
+const AVAILABLE_SYMBOLS = ["BTC-USDT", "ETH-USDT", "AAPL"];
 
 const LiveTradingDashboard: React.FC = () => {
   const [liveTrades, setLiveTrades] = useState<LiveTrade[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState("BTC-USDT");
 
+  // 📡 Listen for SL/TP updates
+  useEffect(() => {
+    const socket = new WebSocket("ws://localhost:8000/ws/ohlcv");
+
+    socket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+
+        if (message.sl_tp_triggered) {
+          const updatedTrade = message.sl_tp_triggered as LiveTrade;
+          setLiveTrades((prevTrades) =>
+            prevTrades.map((trade) =>
+              trade.id === updatedTrade.id ? updatedTrade : trade
+            )
+          );
+        }
+      } catch (err) {
+        console.error("Error parsing SL/TP message:", err);
+      }
+    };
+
+    return () => socket.close();
+  }, []);
+
   const sendTrade = async (side: 'buy' | 'sell') => {
+  try {
+    // Step 1: Fetch current price
+    const res = await fetch(`http://localhost:8000/live/price/${selectedSymbol}`);
+    const { price } = await res.json();
+
+    // Step 2: Calculate SL/TP dynamically (e.g., ±5%)
+    const slOffset = price * 0.05;
+    const tpOffset = price * 0.05;
+
+    const sl = side === 'buy' ? price - slOffset : price + slOffset;
+    const tp = side === 'buy' ? price + tpOffset : price - tpOffset;
+
+    // Step 3: Open WebSocket and send the trade
     const socket = new WebSocket("ws://localhost:8000/ws/live-trading");
 
     socket.onopen = () => {
       const order = {
-        symbol: selectedSymbol, // 💥 dynamic now
+        symbol: selectedSymbol,
         side,
         type: "market",
         quantity: 1,
-        sl: 24000,
-        tp: 26000,
+        sl: parseFloat(sl.toFixed(2)),
+        tp: parseFloat(tp.toFixed(2)),
       };
       socket.send(JSON.stringify(order));
     };
@@ -59,7 +99,13 @@ const LiveTradingDashboard: React.FC = () => {
       setLiveTrades(prev => [response.trade, ...prev.slice(0, 9)]);
       socket.close();
     };
-  };
+  } catch (error) {
+    console.error("Error sending dynamic trade:", error);
+    alert("Failed to send trade. Please try again.");
+  }
+};
+
+
 
   return (
     <div style={{ padding: 24 }}>
@@ -121,7 +167,10 @@ const LiveTradingDashboard: React.FC = () => {
                         size="small"
                         sx={{ marginRight: 1 }}
                       />
-                      ${trade.price_executed} | Qty: {trade.quantity}
+                      ${trade.price_executed} | Qty: {trade.quantity} | Status: {trade.status}
+                      {trade.status.startsWith("closed") && trade.close_price && (
+                        <> | Closed at: ${trade.close_price}</>
+                      )}
                     </>
                   }
                   secondary={new Date(trade.timestamp).toLocaleTimeString()}
@@ -130,7 +179,9 @@ const LiveTradingDashboard: React.FC = () => {
             ))}
         </List>
       </Paper>
+
       <OpenPositions />
+      <ClosedTrades />
     </div>
   );
 };
