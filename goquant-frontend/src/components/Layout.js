@@ -1,11 +1,8 @@
 import React from 'react';
-import { AppBar, Toolbar, Typography, Container, IconButton, Box, Button } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { AppBar, Toolbar, Typography, Container, IconButton } from '@mui/material';
 import { Brightness4, Brightness7 } from '@mui/icons-material';
 
 const Layout = ({ children, toggleTheme, isDarkMode }) => {
-  const navigate = useNavigate();
-
   return (
     <>
       <AppBar position="static">
@@ -13,8 +10,6 @@ const Layout = ({ children, toggleTheme, isDarkMode }) => {
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             GoQuant Backtesting Platform
           </Typography>
-          <Button color="inherit" onClick={() => navigate('/')}>Backtest</Button>
-          <Button color="inherit" onClick={() => navigate('/live-trading')}>Live Trading</Button>
           <IconButton onClick={toggleTheme} color="inherit">
             {isDarkMode ? <Brightness7 /> : <Brightness4 />}
           </IconButton>

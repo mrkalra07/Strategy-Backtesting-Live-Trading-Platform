@@ -198,8 +198,19 @@ const VisualStrategyBuilder: React.FC = () => {
                 />
               </>
             )}
-            <Button variant="contained" color="secondary" sx={{ mt: 2 }} onClick={() => setSelectedNodeId(null)}>
+            <Button variant="contained" color="secondary" sx={{ mt: 2, mr: 1 }} onClick={() => setSelectedNodeId(null)}>
               Close
+            </Button>
+            <Button variant="outlined" color="error" sx={{ mt: 2 }}
+              onClick={() => {
+                if (selectedNodeId) {
+                  setNodes(nds => nds.filter(n => n.id !== selectedNodeId));
+                  setEdges(eds => eds.filter(e => e.source !== selectedNodeId && e.target !== selectedNodeId));
+                  setSelectedNodeId(null);
+                }
+              }}
+            >
+              Delete Node
             </Button>
           </Box>
         )}
@@ -234,30 +245,29 @@ const VisualStrategyBuilder: React.FC = () => {
       {backtestResult && (
         <Box sx={{ mt: 4, p: 3, background: '#222', color: '#fff', borderRadius: 2, maxWidth: 900, mx: 'auto' }}>
           <Typography variant="h6" gutterBottom>Backtest Result</Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mb: 2 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
             <Box>
-              <Typography variant="body2"><b>Status:</b> {backtestResult.status || 'N/A'}</Typography>
-              <Typography variant="body2"><b>Symbol:</b> {backtestResult.symbol || 'N/A'}</Typography>
+              <Typography variant="body2"><b>Status:</b> <span style={{ color: '#90caf9' }}>{backtestResult.status || 'N/A'}</span></Typography>
+              <Typography variant="body2"><b>Symbol:</b> <span style={{ color: '#90caf9' }}>{backtestResult.symbol || 'N/A'}</span></Typography>
               <Typography variant="body2"><b>Node Count:</b> {backtestResult.node_count || 0} &nbsp; <b>Edge Count:</b> {backtestResult.edge_count || 0}</Typography>
             </Box>
-            {backtestResult.total_profit !== undefined && (
-              <Box>
-                <Typography variant="body2"><b>Total Profit:</b> {backtestResult.total_profit.toFixed(2)}</Typography>
-                <Typography variant="body2"><b>Num Trades:</b> {backtestResult.num_trades}</Typography>
-                <Typography variant="body2"><b>Win Rate:</b> {backtestResult.win_rate ? backtestResult.win_rate.toFixed(1) + '%' : 'N/A'}</Typography>
-                <Typography variant="body2"><b>Max Drawdown:</b> {backtestResult.max_drawdown !== undefined ? backtestResult.max_drawdown.toFixed(2) : 'N/A'}</Typography>
-                <Typography variant="body2"><b>Sharpe Ratio:</b> {backtestResult.sharpe_ratio !== undefined ? backtestResult.sharpe_ratio.toFixed(2) : 'N/A'}</Typography>
-                <Typography variant="body2"><b>Sortino Ratio:</b> {backtestResult.sortino_ratio !== undefined ? backtestResult.sortino_ratio.toFixed(2) : 'N/A'}</Typography>
-                <Typography variant="body2"><b>Profit Factor:</b> {backtestResult.profit_factor !== undefined ? backtestResult.profit_factor.toFixed(2) : 'N/A'}</Typography>
-                <Typography variant="body2"><b>Annualized Return:</b> {backtestResult.annualized_return !== undefined ? (backtestResult.annualized_return * 100).toFixed(2) + '%' : 'N/A'}</Typography>
-                <Typography variant="body2"><b>Annualized Volatility:</b> {backtestResult.annualized_volatility !== undefined ? (backtestResult.annualized_volatility * 100).toFixed(2) + '%' : 'N/A'}</Typography>
-              </Box>
-            )}
+            <Box>
+              <Typography variant="body2"><b>Total Profit:</b> <span style={{ color: '#00e676' }}>{backtestResult.total_profit !== null && backtestResult.total_profit !== undefined ? backtestResult.total_profit.toFixed(2) : 'N/A'}</span></Typography>
+              <Typography variant="body2"><b>Num Trades:</b> {backtestResult.num_trades !== null && backtestResult.num_trades !== undefined ? backtestResult.num_trades : 'N/A'}</Typography>
+              <Typography variant="body2"><b>Win Rate:</b> <span style={{ color: '#ffd600' }}>{backtestResult.win_rate !== null && backtestResult.win_rate !== undefined ? backtestResult.win_rate.toFixed(1) + '%' : 'N/A'}</span></Typography>
+              <Typography variant="body2"><b>Max Drawdown:</b> <span style={{ color: '#ff1744' }}>{backtestResult.max_drawdown !== null && backtestResult.max_drawdown !== undefined ? backtestResult.max_drawdown.toFixed(2) : 'N/A'}</span></Typography>
+              <Typography variant="body2"><b>Sharpe Ratio:</b> {backtestResult.sharpe_ratio !== null && backtestResult.sharpe_ratio !== undefined ? backtestResult.sharpe_ratio.toFixed(2) : 'N/A'}</Typography>
+              <Typography variant="body2"><b>Sortino Ratio:</b> {backtestResult.sortino_ratio !== null && backtestResult.sortino_ratio !== undefined ? backtestResult.sortino_ratio.toFixed(2) : 'N/A'}</Typography>
+              <Typography variant="body2"><b>Profit Factor:</b> {backtestResult.profit_factor !== null && backtestResult.profit_factor !== undefined ? backtestResult.profit_factor.toFixed(2) : 'N/A'}</Typography>
+              <Typography variant="body2"><b>Annualized Return:</b> {backtestResult.annualized_return !== null && backtestResult.annualized_return !== undefined ? (backtestResult.annualized_return * 100).toFixed(2) + '%' : 'N/A'}</Typography>
+              <Typography variant="body2"><b>Annualized Volatility:</b> {backtestResult.annualized_volatility !== null && backtestResult.annualized_volatility !== undefined ? (backtestResult.annualized_volatility * 100).toFixed(2) + '%' : 'N/A'}</Typography>
+            </Box>
           </Box>
+          <Box sx={{ borderBottom: '1px solid #444', my: 2 }} />
           {/* Equity Curve Chart */}
           {backtestResult.equity_curve && Array.isArray(backtestResult.equity_curve) && backtestResult.equity_curve.length > 0 && (
             <Box sx={{ mt: 3, mb: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Equity Curve</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 1, color: '#00e676' }}>Equity Curve</Typography>
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={backtestResult.equity_curve} margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#444" />
@@ -273,7 +283,7 @@ const VisualStrategyBuilder: React.FC = () => {
           {/* Drawdown Curve Chart */}
           {backtestResult.drawdown_curve && Array.isArray(backtestResult.drawdown_curve) && backtestResult.drawdown_curve.length > 0 && (
             <Box sx={{ mt: 3, mb: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Drawdown Curve</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 1, color: '#ff1744' }}>Drawdown Curve</Typography>
               <ResponsiveContainer width="100%" height={120}>
                 <LineChart data={backtestResult.drawdown_curve} margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#444" />

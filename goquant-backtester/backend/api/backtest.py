@@ -422,6 +422,7 @@ async def run_backtest(request: Request):
 
 @router.post('/strategy/run')
 async def run_strategy(request: Request):
+    import numpy as np
     payload = await request.json()
     nodes = payload.get('nodes', [])
     edges = payload.get('edges', [])
@@ -473,12 +474,67 @@ async def run_strategy(request: Request):
         # Fallback: no logic node, no signals
         df['signal'] = 0
 
-    # For demo: return the first 5 rows
+    # --- Backtest simulation (simple long-only, no position overlap) ---
+    equity = 10000.0
+    position = 0
+    entry_price = 0
+    trades = []
+    equity_curve = []
+    drawdown_curve = []
+    max_equity = equity
+    for i, row in df.iterrows():
+        price = row['close'] if 'close' in row else None
+        signal = row['signal']
+        date = row['timestamp'] if 'timestamp' in row else i
+        # Enter long
+        if signal == 1 and position == 0 and price:
+            position = 1
+            entry_price = price
+            trades.append({'entry': price, 'entry_time': date})
+        # Exit long (signal off)
+        elif signal == 0 and position == 1 and price:
+            position = 0
+            profit = price - entry_price
+            trades[-1]['exit'] = price
+            trades[-1]['exit_time'] = date
+            trades[-1]['pnl'] = profit
+            equity += profit
+        equity_curve.append({'date': date, 'equity': equity})
+        max_equity = max(max_equity, equity)
+        dd = (equity - max_equity) / max_equity if max_equity > 0 else 0
+        drawdown_curve.append({'date': date, 'drawdown': dd})
+
+    # Metrics
+    total_profit = equity - 10000.0
+    num_trades = len([t for t in trades if 'exit' in t])
+    wins = [t for t in trades if 'exit' in t and t['pnl'] > 0]
+    losses = [t for t in trades if 'exit' in t and t['pnl'] <= 0]
+    win_rate = (len(wins) / num_trades * 100) if num_trades > 0 else None
+    max_drawdown = min([d['drawdown'] for d in drawdown_curve]) if drawdown_curve else 0
+    returns = [t['pnl'] for t in trades if 'exit' in t]
+    sharpe_ratio = (np.mean(returns) / np.std(returns) * np.sqrt(252)) if len(returns) > 1 and np.std(returns) > 0 else None
+    sortino_ratio = (np.mean(returns) / np.std([r for r in returns if r < 0]) * np.sqrt(252)) if len([r for r in returns if r < 0]) > 0 else None
+    profit_factor = (sum([r for r in returns if r > 0]) / abs(sum([r for r in returns if r < 0]))) if sum([r for r in returns if r < 0]) != 0 else None
+    annualized_return = (equity / 10000.0) ** (252 / len(df)) - 1 if len(df) > 0 else None
+    annualized_volatility = (np.std(returns) * np.sqrt(252)) / 10000.0 if len(returns) > 1 else None
+
     return JSONResponse({
         'status': 'parsed',
         'symbol': symbol,
         'head': df.head(5).to_dict(orient='records'),
         'columns': list(df.columns),
         'node_count': len(nodes),
-        'edge_count': len(edges)
+        'edge_count': len(edges),
+        'total_profit': total_profit,
+        'num_trades': num_trades,
+        'win_rate': win_rate,
+        'max_drawdown': max_drawdown,
+        'sharpe_ratio': sharpe_ratio,
+        'sortino_ratio': sortino_ratio,
+        'profit_factor': profit_factor,
+        'annualized_return': annualized_return,
+        'annualized_volatility': annualized_volatility,
+        'equity_curve': equity_curve,
+        'drawdown_curve': drawdown_curve,
+        'trades': trades
     })

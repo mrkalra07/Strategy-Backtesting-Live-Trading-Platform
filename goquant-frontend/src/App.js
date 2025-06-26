@@ -23,6 +23,7 @@ function App() {
   const [showLivePanel, setShowLivePanel] = useState(false);
   const [showStrategyBuilder, setShowStrategyBuilder] = useState(false);
   const [showVisualBuilder, setShowVisualBuilder] = useState(false);
+  const [showLiveTrading, setShowLiveTrading] = useState(false);
 
   const theme = useMemo(() =>
     createTheme({
@@ -90,7 +91,14 @@ function App() {
           toggleTheme={toggleTheme}
           isDarkMode={mode === 'dark'}
         >
-          {showVisualBuilder ? (
+          {showLiveTrading ? (
+            <Box sx={{ my: 2 }}>
+              <Button variant="outlined" color="secondary" onClick={() => setShowLiveTrading(false)}>
+                Back to Main
+              </Button>
+              <LiveTradingDashboard />
+            </Box>
+          ) : showVisualBuilder ? (
             <Box sx={{ my: 2 }}>
               <Button variant="outlined" color="secondary" onClick={() => setShowVisualBuilder(false)}>
                 Back to Main
@@ -100,9 +108,12 @@ function App() {
           ) : (
             <>
               <UploadCSV onUploadSuccess={handleUploadSuccess} />
-              <Box sx={{ my: 2 }}>
+              <Box sx={{ my: 2, display: 'flex', gap: 2 }}>
                 <Button variant="contained" color="primary" onClick={() => setShowVisualBuilder(true)}>
                   Open Visual Strategy Builder
+                </Button>
+                <Button variant="contained" color="success" onClick={() => setShowLiveTrading(true)}>
+                  Live Trading
                 </Button>
               </Box>
               {uploadedData && (
