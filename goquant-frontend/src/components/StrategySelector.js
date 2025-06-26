@@ -35,7 +35,6 @@ export default function StrategySelector({ onRunBacktest, strategy, setStrategy 
             <MenuItem value="ema">EMA</MenuItem>
             <MenuItem value="rsi">RSI</MenuItem>
             <MenuItem value="macd">MACD</MenuItem>
-            <MenuItem value="custom">Custom</MenuItem>
           </Select>
         </FormControl>
         <Grid container spacing={2}>
@@ -58,16 +57,14 @@ export default function StrategySelector({ onRunBacktest, strategy, setStrategy 
             </Grid>
           ))}
         </Grid>
-        {strategy !== 'custom' && (
-          <Button
-            variant="contained"
-            fullWidth
-            sx={{ mt: 2 }}
-            onClick={handleRun}
-          >
-            Run Backtest
-          </Button>
-        )}
+        <Button
+          variant="contained"
+          fullWidth
+          sx={{ mt: 2 }}
+          onClick={handleRun}
+        >
+          Run Backtest
+        </Button>
       </AccordionDetails>
     </Accordion>
   );

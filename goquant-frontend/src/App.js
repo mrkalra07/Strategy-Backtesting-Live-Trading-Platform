@@ -4,7 +4,6 @@ import { createTheme, ThemeProvider, CssBaseline, Box, Button } from '@mui/mater
 import Layout from './components/Layout';
 import UploadCSV from './components/UploadCSV';
 import StrategySelector from './components/StrategySelector';
-import StrategyBuilder from './components/StrategyBuilder/StrategyBuilder';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import LiveTradingDashboard from './components/LiveTradingDashboard';
 import LiveBacktestPanel from './components/LiveBacktestPanel';
@@ -123,12 +122,6 @@ function App() {
                     setStrategy={setStrategy}
                     strategy={strategy}
                   />
-                  {strategy === 'custom' && (
-                    <StrategyBuilder
-                      uploadedOHLCVData={uploadedData}
-                      onResult={(res) => setBacktestResult(res)}
-                    />
-                  )}
                 </>
               )}
               {showLivePanel && wsPayload && (

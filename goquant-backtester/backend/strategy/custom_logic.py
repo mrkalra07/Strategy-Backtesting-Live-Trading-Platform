@@ -1,3 +1,4 @@
+#custom_logic
 import pandas as pd
 import re
 from ta.trend import EMAIndicator
@@ -33,7 +34,14 @@ def evaluate_custom_logic(data: pd.DataFrame, logic: str) -> pd.DataFrame:
         condition_str = condition_str.replace("AND", "and").replace("OR", "or")
 
         # Evaluate the condition using pandas.eval row-wise
-        condition_result = df.eval(condition_str, engine='python')
+        try:
+            condition_result = df.eval(condition_str, engine='python')
+            # Ensure condition_result is a boolean Series
+            if not pd.api.types.is_bool_dtype(condition_result):
+                condition_result = condition_result.astype(bool)
+        except Exception as e:
+            print(f"Error evaluating condition '{condition_str}': {e}")
+            continue
 
         # Apply signal based on action
         if action == "BUY":
@@ -41,4 +49,6 @@ def evaluate_custom_logic(data: pd.DataFrame, logic: str) -> pd.DataFrame:
         elif action == "SELL":
             df.loc[condition_result, 'signal'] = -1
 
+    # DEBUG: Print signal counts
+    print("Signal value counts:", df['signal'].value_counts())
     return df

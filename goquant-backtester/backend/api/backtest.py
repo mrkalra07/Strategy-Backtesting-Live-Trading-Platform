@@ -422,58 +422,18 @@ async def run_backtest(request: Request):
 
 @router.post('/strategy/run')
 async def run_strategy(request: Request):
-    import numpy as np
     payload = await request.json()
+    logic = payload.get('logic')
+    data = payload.get('data')
     nodes = payload.get('nodes', [])
     edges = payload.get('edges', [])
-    data = payload.get('data', {})
-
-    node_map, children, parents = parse_graph(nodes, edges)
-
-    # Find asset node (start node)
-    asset_nodes = [n for n in nodes if n['data'].get('nodeType') == 'asset']
-    if not asset_nodes:
-        raise HTTPException(status_code=400, detail='No asset node found.')
-    asset_node = asset_nodes[0]
-    symbol = asset_node['data'].get('symbol') or list(data.keys())[0]
-    ohlcv = data[symbol]['ohlcv'] if symbol in data else []
+    if not logic or not data:
+        raise HTTPException(status_code=400, detail='Missing logic string or data')
+    # Assume single symbol for now
+    symbol = list(data.keys())[0]
+    ohlcv = data[symbol]['ohlcv'] if 'ohlcv' in data[symbol] else data[symbol]
     df = pd.DataFrame(ohlcv)
-
-    # Traverse and apply indicators
-    indicator_nodes = [n for n in nodes if n['data'].get('nodeType') == 'indicator']
-    for ind_node in indicator_nodes:
-        ind_type = ind_node['data'].get('indicatorType')
-        if ind_type == 'rsi':
-            period = ind_node['data'].get('period', 14)
-            df['rsi'] = pd.Series([row['rsi'] for row in generate_rsi_signals(ohlcv, period=period)])
-        elif ind_type == 'ema':
-            period = ind_node['data'].get('period', 14)
-            df['ema'] = pd.Series([row['ema_short'] for row in generate_ema_signals(ohlcv, short_span=period, long_span=period+10)])
-        elif ind_type == 'macd':
-            df['macd'] = pd.Series([row['macd'] for row in generate_macd_signals(ohlcv)])
-
-    # Traverse and apply logic nodes (for demo, just use the first logic node)
-    logic_nodes = [n for n in nodes if n['data'].get('nodeType') == 'logic']
-    if logic_nodes:
-        logic_type = logic_nodes[0]['data'].get('logicType', 'and')
-        # For demo: if indicator > threshold, signal = 1 else 0
-        if 'rsi' in df.columns:
-            if logic_type == 'gt':
-                df['signal'] = (df['rsi'] > 50).astype(int)
-            elif logic_type == 'lt':
-                df['signal'] = (df['rsi'] < 50).astype(int)
-            else:
-                df['signal'] = (df['rsi'] > 50).astype(int)
-        elif 'ema' in df.columns:
-            df['signal'] = (df['ema'] > df['ema'].rolling(5).mean()).astype(int)
-        elif 'macd' in df.columns:
-            df['signal'] = (df['macd'] > 0).astype(int)
-        else:
-            df['signal'] = 0
-    else:
-        # Fallback: no logic node, no signals
-        df['signal'] = 0
-
+    df = evaluate_custom_logic(df, logic)
     # --- Backtest simulation (simple long-only, no position overlap) ---
     equity = 10000.0
     position = 0
@@ -503,7 +463,6 @@ async def run_strategy(request: Request):
         max_equity = max(max_equity, equity)
         dd = (equity - max_equity) / max_equity if max_equity > 0 else 0
         drawdown_curve.append({'date': date, 'drawdown': dd})
-
     # Metrics
     total_profit = equity - 10000.0
     num_trades = len([t for t in trades if 'exit' in t])
@@ -518,13 +477,24 @@ async def run_strategy(request: Request):
     annualized_return = (equity / 10000.0) ** (252 / len(df)) - 1 if len(df) > 0 else None
     annualized_volatility = (np.std(returns) * np.sqrt(252)) / 10000.0 if len(returns) > 1 else None
 
-    return JSONResponse({
+    # Clean all out-of-range float values for JSON
+    def clean_floats(obj):
+        if isinstance(obj, float):
+            if np.isnan(obj) or np.isinf(obj):
+                return None
+            return obj
+        elif isinstance(obj, dict):
+            return {k: clean_floats(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [clean_floats(x) for x in obj]
+        return obj
+
+    return JSONResponse(clean_floats({
         'status': 'parsed',
         'symbol': symbol,
         'head': df.head(5).to_dict(orient='records'),
         'columns': list(df.columns),
-        'node_count': len(nodes),
-        'edge_count': len(edges),
+        'logic': logic,
         'total_profit': total_profit,
         'num_trades': num_trades,
         'win_rate': win_rate,
@@ -536,5 +506,7 @@ async def run_strategy(request: Request):
         'annualized_volatility': annualized_volatility,
         'equity_curve': equity_curve,
         'drawdown_curve': drawdown_curve,
-        'trades': trades
-    })
+        'trades': trades,
+        'node_count': len(nodes),
+        'edge_count': len(edges)
+    }))
