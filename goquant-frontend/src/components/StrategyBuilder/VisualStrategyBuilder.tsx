@@ -223,6 +223,8 @@ const VisualStrategyBuilder: React.FC = () => {
           variant="contained"
           color="primary"
           onClick={async () => {
+            const logicString = convertGraphToLogicString(nodes, edges).trim();
+            console.log('PARSED LOGIC STRING:', logicString); // <-- Console print for debugging
             try {
               const logicString = convertGraphToLogicString(nodes, edges);
               console.log({ logicString, uploadedData, nodes, edges });
