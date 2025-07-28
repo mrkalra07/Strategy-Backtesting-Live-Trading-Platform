@@ -1,4 +1,4 @@
-# 🚀 GoQuant – Full-Stack Strategy Backtesting & Live Trading Platform
+# 🚀  Full-Stack Strategy Backtesting & Live Trading Platform
 
 A professional-grade backtesting and live trading platform with a **visual strategy builder** and full **analytics dashboard**. Designed for quantitative strategy development, it supports **technical indicators**, **portfolio logic**, **multi-symbol data**, and **real-time trade simulation**.
 
